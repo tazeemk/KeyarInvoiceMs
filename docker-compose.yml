@@ -1,0 +1,63 @@
+services:
+  db:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -p\"$${MYSQL_ROOT_PASSWORD}\""]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    environment:
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?Copy .env.example to .env and set a unique Django secret}
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-False}
+      DJANGO_SECURE_SSL_REDIRECT: ${DJANGO_SECURE_SSL_REDIRECT:-False}
+      DJANGO_SECURE_COOKIES: ${DJANGO_SECURE_COOKIES:-False}
+      DJANGO_HSTS_SECONDS: ${DJANGO_HSTS_SECONDS:-0}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1}
+      DJANGO_CORS_ALLOWED_ORIGINS: ${DJANGO_CORS_ALLOWED_ORIGINS:-http://localhost:8080}
+      DJANGO_ADMIN_USERNAME: ${DJANGO_ADMIN_USERNAME:?Set DJANGO_ADMIN_USERNAME in .env}
+      DJANGO_ADMIN_PASSWORD: ${DJANGO_ADMIN_PASSWORD:?Set DJANGO_ADMIN_PASSWORD in .env}
+      DJANGO_ADMIN_EMAIL: ${DJANGO_ADMIN_EMAIL:-admin@example.invalid}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:?Set MYSQL_DATABASE in .env}
+      MYSQL_USER: ${MYSQL_USER:?Set MYSQL_USER in .env}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in .env}
+      DB_HOST: db
+      DB_PORT: 3306
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "from urllib.request import Request, urlopen; urlopen(Request('http://127.0.0.1:8000/api/health/', headers={'X-Forwarded-Proto': 'https'})).read()"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-8080}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1/"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  mysql_data:
