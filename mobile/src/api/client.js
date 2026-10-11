@@ -28,7 +28,7 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const original = error.config;
-    const isAuthRequest = /auth\/(token|logout)/.test(original?.url || "");
+    const isAuthRequest = /auth\/token/.test(original?.url || "");
     if (error.response?.status !== 401 || !original || original._retried || isAuthRequest) {
       return Promise.reject(error);
     }
@@ -74,18 +74,8 @@ export async function signIn(username, password) {
 }
 
 export async function signOut() {
-  const refresh = await SecureStore.getItemAsync("keyar_refresh");
-  let revokeError;
-  if (refresh) {
-    try {
-      await api.post("auth/logout/", { refresh });
-    } catch (error) {
-      if (![400, 401].includes(error.response?.status)) revokeError = error;
-    }
-  }
   await SecureStore.deleteItemAsync("keyar_access");
   await SecureStore.deleteItemAsync("keyar_refresh");
-  if (revokeError) throw revokeError;
 }
 
 export async function fetchAll(path, params = {}) {

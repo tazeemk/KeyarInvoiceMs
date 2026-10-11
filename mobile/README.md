@@ -34,7 +34,6 @@ In the Expo terminal, press `a` to open an installed Android emulator or scan th
 The app uses the Django routes and response fields implemented in `backend/config/urls.py`, `backend/invoicing/urls.py`, `views.py`, and `serializers.py`:
 
 - `POST /api/auth/token/` and `POST /api/auth/token/refresh/` — SimpleJWT access/refresh tokens.
-- `POST /api/auth/logout/` with `{ "refresh": "…" }` — blacklist the refresh token.
 - `GET /api/auth/me/` — authenticated user, including `role_display` (`Admin` or `Staff`).
 - `GET /api/dashboard/summary/` — counts, sales sums, monthly totals, and recent invoices.
 - `/api/customers/` — list/search and customer CRUD (`name`, `address`, `gstin`, `state`, `state_code`, `mobile`; this API does not expose customer email).
@@ -46,7 +45,7 @@ The app uses the Django routes and response fields implemented in `backend/confi
 
 Access rules are enforced by the Django API. Staff may use normal invoice/customer/product operations and view settings; only Admin users can manage team members or update company settings. The backend does not currently expose payment status, so invoices are shown as issued, not paid/unpaid.
 
-Access and refresh tokens are stored with Expo SecureStore. Authenticated calls attach the access token, refresh once after a 401, and sign the user out if refresh is invalid/expired. Lists follow DRF pagination and pass the API's `search`, date, and active query parameters.
+Access and refresh tokens are stored with Expo SecureStore. Authenticated calls attach the access token, refresh after a 401, and sign the user out if refresh is invalid/expired. Signing out deletes tokens from this device only; the server does not revoke refresh tokens, which remain usable until their one-day expiry if copied. Lists follow DRF pagination and pass the API's `search`, date, and active query parameters.
 
 ## Included mobile workflows
 
@@ -86,11 +85,18 @@ The `preview` profile in `eas.json` produces an installable APK. Keep the produc
 
 ### Local Android build
 
-Configure Android Studio and the Android SDK, set `EXPO_PUBLIC_API_URL`, then run:
+Configure Android Studio, the Android SDK, and a compatible JDK. From the `mobile/` directory, set the API URL and generate the native Android project (if it has not already been generated):
 
 ```powershell
+ $env:EXPO_PUBLIC_API_URL="https://your-domain.example/api/"
 npx expo prebuild --platform android
-npx expo run:android
 ```
 
-For a signed production release, configure Android signing credentials through EAS or Android's secure signing setup. Do not commit keystores or signing secrets.
+Then build the installable debug APK directly with Gradle:
+
+```powershell
+cd .\android
+.\gradlew.bat assembleDebug
+```
+
+The APK is created at `android\app\build\outputs\apk\debug\app-debug.apk`. Run `.\gradlew.bat assembleDebug` again after code changes to rebuild it. `npx expo run:android` is an alternative that builds and installs the app on a connected device or emulator. For a signed production release, configure Android signing credentials through EAS or Android's secure signing setup. Do not commit keystores or signing secrets.

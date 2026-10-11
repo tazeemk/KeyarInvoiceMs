@@ -117,14 +117,13 @@ class InvoiceApiTests(TestCase):
         self.customer.save()
         self.assertEqual(self.client.get(f"/api/invoices/{response.data['id']}/").data["customer_name"], "Local Buyer")
 
-    def test_logout_blacklists_refresh_token(self):
-        self.client.force_authenticate(self.admin)
+    def test_refresh_token_can_be_reused_until_expiration(self):
         from rest_framework_simplejwt.tokens import RefreshToken
         token = str(RefreshToken.for_user(self.admin))
-        response = self.client.post("/api/auth/logout/", {"refresh": token}, format="json")
-        self.assertEqual(response.status_code, 204)
         refresh_again = self.client.post("/api/auth/token/refresh/", {"refresh": token}, format="json")
-        self.assertEqual(refresh_again.status_code, 401)
+        self.assertEqual(refresh_again.status_code, 200, refresh_again.data)
+        self.assertIn("access", refresh_again.data)
+        self.assertNotIn("refresh", refresh_again.data)
 
 
 class AmountInWordsTests(TestCase):

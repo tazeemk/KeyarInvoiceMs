@@ -42,17 +42,8 @@ export async function signIn(username, password) {
 }
 
 export async function signOut() {
-  const refresh = localStorage.getItem("keyar_refresh");
-  let revocationError;
-  if (refresh) {
-    try { await api.post("auth/logout/", { refresh }); }
-    catch (error) {
-      if (![400, 401].includes(error.response?.status)) revocationError = error;
-    }
-  }
   localStorage.removeItem("keyar_access");
   localStorage.removeItem("keyar_refresh");
-  if (revocationError) throw revocationError;
 }
 
 export async function downloadInvoicePdf(id, invoiceNumber) {

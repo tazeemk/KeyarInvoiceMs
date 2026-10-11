@@ -33,7 +33,7 @@ First boot creates five editable demo products based on the visible reference: I
 
 ## Features and access
 
-- Admin and Staff accounts; Django password hashing; JWT access/refresh tokens; refresh rotation/blacklisting and logout revocation.
+- Admin and Staff accounts; Django password hashing; JWT access/refresh tokens. Signing out clears tokens from that client only; refresh tokens are not revoked server-side and remain usable until they expire.
 - Role-protected team management and company settings. Staff can manage invoices, customers, and products.
 - Dashboard revenue/invoice summaries and recent activity.
 - Customer and product CRUD with search; invoice search and date filters.
