@@ -29,7 +29,7 @@ export default function LoginScreen() {
   }
 
   return (
-    <Page scroll={false} style={styles.page}>
+    <Page style={styles.page}>
       <StatusBar style="light" />
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.center}>
         <View style={styles.hero}>

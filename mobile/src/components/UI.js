@@ -5,6 +5,7 @@ import {
   Image,
   Modal,
   Pressable,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -17,10 +18,17 @@ import { colors } from "../theme";
 export function Page({ children, scroll = true, style, refreshControl }) {
   const Container = scroll ? ScrollView : View;
   return (
-    <SafeAreaView style={styles.safe} edges={["top"]}>
+    <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
       <Container
         style={[styles.page, style]}
-        {...(scroll ? { contentContainerStyle: styles.pageContent, keyboardShouldPersistTaps: "handled", refreshControl } : {})}
+        {...(scroll ? {
+          contentContainerStyle: styles.pageContent,
+          keyboardShouldPersistTaps: "handled",
+          keyboardDismissMode: Platform.OS === "ios" ? "interactive" : "on-drag",
+          scrollsChildToFocus: true,
+          automaticallyAdjustKeyboardInsets: Platform.OS === "ios",
+          refreshControl,
+        } : {})}
       >
         {children}
       </Container>
@@ -101,13 +109,21 @@ export function Loading({ label = "Loading…" }) {
 
 export function FormModal({ visible, title, children, onClose }) {
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+    <Modal visible={visible} animationType="slide" presentationStyle={Platform.OS === "ios" ? "pageSheet" : "fullScreen"} onRequestClose={onClose}>
       <SafeAreaView style={styles.modal} edges={["top", "bottom"]}>
         <View style={styles.modalHeader}>
           <Text style={styles.modalTitle}>{title}</Text>
-          <Pressable accessibilityLabel="Close form" onPress={onClose}><Text style={styles.close}>✕</Text></Pressable>
+          <Pressable accessibilityRole="button" accessibilityLabel="Close form" onPress={onClose}><Text style={styles.close}>✕</Text></Pressable>
         </View>
-        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.modalContent}>{children}</ScrollView>
+        <ScrollView
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
+          scrollsChildToFocus
+          automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
+          contentContainerStyle={styles.modalContent}
+        >
+          {children}
+        </ScrollView>
       </SafeAreaView>
     </Modal>
   );
@@ -123,7 +139,7 @@ export function confirmAction(title, message, onConfirm) {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.canvas },
   page: { flex: 1, paddingHorizontal: 18 },
-  pageContent: { paddingTop: 14, paddingBottom: 36, gap: 16 },
+  pageContent: { flexGrow: 1, paddingTop: 14, paddingBottom: 36, gap: 16 },
   header: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 2 },
   brandImage: { width: 78, height: 42 },
   headerTitle: { color: colors.ink, fontWeight: "800", fontSize: 25, letterSpacing: -0.5 },
@@ -151,5 +167,5 @@ const styles = StyleSheet.create({
   modalHeader: { minHeight: 58, paddingHorizontal: 20, borderBottomWidth: 1, borderColor: colors.line, flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: colors.white },
   modalTitle: { color: colors.ink, fontSize: 18, fontWeight: "800" },
   close: { fontSize: 20, color: colors.muted, padding: 4 },
-  modalContent: { padding: 18, paddingBottom: 40 },
+  modalContent: { flexGrow: 1, padding: 18, paddingBottom: 40 },
 });

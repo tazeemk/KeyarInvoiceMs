@@ -20,8 +20,9 @@ class InvoiceAdmin(admin.ModelAdmin):
 
 @admin.register(Customer)
 class CustomerAdmin(admin.ModelAdmin):
-    list_display = ("name", "gstin", "state", "state_code", "mobile")
+    list_display = ("name", "gstin", "state", "pincode", "mobile")
     search_fields = ("name", "gstin", "mobile")
+    exclude = ("state_code",)
 
 
 @admin.register(Product)
@@ -33,4 +34,5 @@ class ProductAdmin(admin.ModelAdmin):
 
 @admin.register(CompanySettings)
 class CompanySettingsAdmin(admin.ModelAdmin):
-    list_display = ("brand_name", "company_name", "state", "state_code", "is_sample")
+    list_display = ("brand_name", "company_name", "state", "pincode", "is_sample")
+    exclude = ("state_code",)

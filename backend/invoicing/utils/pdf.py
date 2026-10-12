@@ -29,7 +29,7 @@ def render_invoice_pdf(invoice):
     company_address = invoice.supplier_address or settings.address
     company_gstin = invoice.supplier_gstin or settings.gstin
     company_state = invoice.supplier_state or settings.state
-    company_state_code = invoice.supplier_state_code or settings.state_code
+    company_pincode = invoice.supplier_pincode or settings.pincode
     company_phone = invoice.supplier_phone or settings.phone
     company_email = invoice.supplier_email or settings.email
     bank_name = invoice.supplier_bank_name or settings.bank_name
@@ -41,7 +41,7 @@ def render_invoice_pdf(invoice):
     customer_address = invoice.customer_address or invoice.customer.address
     customer_gstin = invoice.customer_gstin or invoice.customer.gstin
     customer_state = invoice.customer_state or invoice.customer.state
-    customer_state_code = invoice.customer_state_code or invoice.customer.state_code
+    customer_pincode = invoice.customer_pincode or invoice.customer.pincode
     customer_mobile = invoice.customer_mobile or invoice.customer.mobile
     buffer = BytesIO()
     styles = getSampleStyleSheet()
@@ -80,7 +80,7 @@ def render_invoice_pdf(invoice):
         canvas.drawString(190, height - 61, company_name)
         canvas.setFont("Helvetica", 7)
         canvas.drawString(190, height - 73, company_address.replace("\n", " ")[:100])
-        canvas.drawString(190, height - 85, f"GSTIN: {company_gstin}  |  {company_state} - {company_state_code}")
+        canvas.drawString(190, height - 85, f"GSTIN: {company_gstin}  |  {company_state} - PIN {company_pincode}")
         canvas.drawString(190, height - 97, f"Phone: {company_phone}  |  {company_email}")
         qr_content = f"Keyar invoice {invoice.invoice_number} | INR {invoice.grand_total} | GSTIN {company_gstin}"
         qr = qrcode.make(qr_content)
@@ -127,13 +127,13 @@ def render_invoice_pdf(invoice):
     supplier = (
         f"<b>Supplier (Despatch From)</b><br/><b>{safe(company_name)}</b><br/>"
         f"{safe(company_address)}<br/>GSTIN: {safe(company_gstin)}<br/>"
-        f"State: {safe(company_state)} | Code: {safe(company_state_code)}<br/>"
+        f"State: {safe(company_state)} | PIN Code: {safe(company_pincode) or '—'}<br/>"
         f"Phone: {safe(company_phone)}"
     )
     buyer = (
         f"<b>Buyer (Bill To / Ship To)</b><br/><b>{safe(customer_name)}</b><br/>"
         f"{safe(customer_address)}<br/>GSTIN: {safe(customer_gstin) or 'Unregistered'}<br/>"
-        f"State: {safe(customer_state)} | Code: {safe(customer_state_code)}<br/>"
+        f"State: {safe(customer_state)} | PIN Code: {safe(customer_pincode) or '—'}<br/>"
         f"Mobile: {safe(customer_mobile) or '—'}"
     )
     parties = Table(

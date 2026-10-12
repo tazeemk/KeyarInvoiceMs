@@ -11,6 +11,11 @@ import { Button, EmptyState, Field, Loading, Modal, Notice, PageHeader } from ".
 
 const money = (value) => new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 }).format(Number(value || 0));
 const today = () => new Date().toLocaleDateString("en-CA");
+const isInterstate = (supplier, customer) => {
+  const supplierCode = supplier.state_code && supplier.state_code !== "00" ? supplier.state_code : "";
+  if (supplierCode && customer.state_code) return supplierCode !== customer.state_code;
+  return supplier.state.trim().toLocaleLowerCase() !== customer.state.trim().toLocaleLowerCase();
+};
 async function fetchAll(path) {
   const first = await api.get(path);
   if (Array.isArray(first.data)) return first.data;
@@ -188,7 +193,7 @@ function Dashboard({ summary, goInvoices, goCreate }) {
 const CUSTOMER_FIELDS = [
   { name: "name", label: "Customer name" }, { name: "gstin", label: "GSTIN" },
   { name: "address", label: "Address", rows: 2 }, { name: "state", label: "State" },
-  { name: "state_code", label: "State code", placeholder: "Two-digit code" },
+  { name: "pincode", label: "PIN code", placeholder: "Six-digit PIN code", maxLength: 6, inputMode: "numeric", required: true },
   { name: "mobile", label: "Mobile number" },
 ];
 const PRODUCT_FIELDS = [
@@ -240,7 +245,7 @@ function ManagedRecords({ kind, notify }) {
   const columns = isCustomer ? [
     { label: "Customer", render: (row) => <div><p className="font-semibold text-slate-800">{row.name}</p><p className="mt-0.5 max-w-[220px] truncate text-xs text-slate-400">{row.address}</p></div> },
     { label: "GSTIN", render: (row) => row.gstin || <span className="text-slate-400">Unregistered</span> },
-    { label: "State", render: (row) => `${row.state} · ${row.state_code}` },
+    { label: "State", render: (row) => `${row.state} · PIN ${row.pincode || "not set"}` },
     { label: "Mobile", key: "mobile" },
   ] : [
     { label: "Product", render: (row) => <div><p className="font-semibold text-slate-800">{row.name}</p><p className="mt-0.5 text-xs text-slate-400">{[row.size, row.colour].filter(Boolean).join(" · ")}</p></div> },
@@ -252,14 +257,14 @@ function ManagedRecords({ kind, notify }) {
   columns.push({ label: "Actions", render: (row) => <div className="flex items-center gap-1"><button aria-label={`Edit ${row.name}`} onClick={() => setEditing({ ...row })} className="rounded-lg p-2 text-slate-400 hover:bg-keyar-50 hover:text-keyar-800"><Pencil size={16} /></button><button aria-label={`Delete ${row.name}`} onClick={() => remove(row)} className="rounded-lg p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-700"><Trash2 size={16} /></button></div> });
   return <>
     <PageHeader eyebrow="Manage your records" title={title} description={isCustomer ? "Keep billing details and GST registration ready for invoicing." : "Set product details, HSN codes, units, rates, and GST defaults."}
-      action={<Button onClick={() => setEditing(isCustomer ? { name: "", address: "", gstin: "", state: "", state_code: "", mobile: "" } : { name: "", hsn_code: "", size: "", colour: "", unit: "PCS", default_price: "", gst_rate: "18.00", active: true })}><Plus size={17} /> Add {isCustomer ? "customer" : "product"}</Button>} />
+      action={<Button onClick={() => setEditing(isCustomer ? { name: "", address: "", gstin: "", state: "", state_code: "", pincode: "", mobile: "" } : { name: "", hsn_code: "", size: "", colour: "", unit: "PCS", default_price: "", gst_rate: "18.00", active: true })}><Plus size={17} /> Add {isCustomer ? "customer" : "product"}</Button>} />
     <section className="card">
-      <div className="mb-4 flex max-w-md items-center gap-2 rounded-lg border border-slate-200 px-3"><Search size={16} className="text-slate-400" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={`Search ${isCustomer ? "customers by name, GSTIN, or mobile" : "products by name or HSN"}`} aria-label={`Search ${title.toLowerCase()}`} className="h-10 w-full text-sm outline-none" /></div>
+      <div className="mb-4 flex max-w-md items-center gap-2 rounded-lg border border-slate-200 px-3"><Search size={16} className="text-slate-400" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={`Search ${isCustomer ? "customers by name, GSTIN, PIN, or mobile" : "products by name or HSN"}`} aria-label={`Search ${title.toLowerCase()}`} className="h-10 w-full text-sm outline-none" /></div>
       {busy ? <Loading label={`Loading ${title.toLowerCase()}…`} /> : <DataTable columns={columns} rows={rows} empty={{ title: `No ${isCustomer ? "customers" : "products"} found`, description: "Add a record or change your search." }} />}
     </section>
     {editing && <Modal title={`${editing.id ? "Edit" : "Add"} ${isCustomer ? "customer" : "product"}`} onClose={() => setEditing(null)}>
       <form onSubmit={save} className="grid gap-4 sm:grid-cols-2">
-        {fields.map((field) => <div key={field.name} className={field.rows || field.name === "address" ? "sm:col-span-2" : ""}><Field {...field} value={editing[field.name]} onChange={(event) => setEditing({ ...editing, [field.name]: event.target.value })} /></div>)}
+        {fields.map((field) => <div key={field.name} className={field.rows || field.name === "address" ? "sm:col-span-2" : ""}><Field {...field} value={editing[field.name]} onChange={(event) => setEditing({ ...editing, [field.name]: field.name === "pincode" ? event.target.value.replace(/\D/g, "").slice(0, 6) : event.target.value })} /></div>)}
         {!isCustomer && editing.id && <label className="flex items-center gap-2 text-sm text-slate-600"><input type="checkbox" checked={editing.active} onChange={(event) => setEditing({ ...editing, active: event.target.checked })} /> Available for new invoices</label>}
         <div className="mt-2 flex justify-end gap-2 sm:col-span-2"><Button type="button" variant="secondary" onClick={() => setEditing(null)}>Cancel</Button><Button type="submit" disabled={saving}>{saving ? "Saving…" : "Save record"}</Button></div>
       </form>
@@ -276,7 +281,7 @@ function InvoiceEditor({ invoice, customers, products, company, onClose, onSaved
   const [form, setForm] = useState(initial);
   const [saving, setSaving] = useState(false);
   const customer = customers.find((item) => String(item.id) === form.customer);
-  const interstate = Boolean(customer && company && customer.state_code !== company.state_code);
+  const interstate = Boolean(customer && company && isInterstate(company, customer));
   const enriched = form.items.map((line) => {
     const product = products.find((entry) => String(entry.id) === line.product);
     return { ...line, gst_rate: Number(line.gst_rate ?? product?.gst_rate ?? 0) };
@@ -313,7 +318,7 @@ function InvoiceEditor({ invoice, customers, products, company, onClose, onSaved
   return <Modal title={invoice ? `Edit ${invoice.invoice_number}` : "Create tax invoice"} onClose={onClose}>
     <form onSubmit={submit}>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <Field label="Customer" name="customer" value={form.customer} options={customers.map((item) => ({ value: item.id, label: `${item.name} · ${item.state_code}` }))} onChange={(event) => setForm({ ...form, customer: event.target.value })} />
+        <Field label="Customer" name="customer" value={form.customer} options={customers.map((item) => ({ value: item.id, label: `${item.name} · ${item.state} · PIN ${item.pincode || "not set"}` }))} onChange={(event) => setForm({ ...form, customer: event.target.value })} />
         <Field label="Invoice date" name="invoice_date" type="date" value={form.invoice_date} onChange={(event) => setForm({ ...form, invoice_date: event.target.value })} />
         <Field label="Due date" name="due_date" type="date" value={form.due_date} onChange={(event) => setForm({ ...form, due_date: event.target.value })} />
         <Field label="Vehicle number" name="vehicle_number" value={form.vehicle_number} onChange={(event) => setForm({ ...form, vehicle_number: event.target.value })} />
@@ -500,7 +505,7 @@ function UsersPage({ notify, currentUser }) {
 const SETTING_FIELDS = [
   ["company_name", "Registered company name", "text", true], ["brand_name", "Brand name", "text", true],
   ["address", "Registered address", "textarea", true], ["gstin", "Company GSTIN", "text", true],
-  ["state", "Supplier state", "text", true], ["state_code", "Supplier state code", "text", true],
+  ["state", "Supplier state", "text", true], ["pincode", "Supplier PIN code", "text", true],
   ["phone", "Company phone", "text", false], ["email", "Accounts email", "email", false],
   ["invoice_prefix", "Invoice number prefix", "text", true],
   ["bank_name", "Bank name", "text", false], ["bank_account", "Bank account number", "text", false],
@@ -533,7 +538,7 @@ function SettingsPage({ notify }) {
     {form.is_sample && <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"><b>Sample company profile:</b> update and verify company GSTIN, address, phone, bank account, and IFSC before issuing invoices.</div>}
     <form onSubmit={submit} className="space-y-5">
       <section className="card"><div className="mb-5 flex items-center gap-3"><div className="rounded-lg bg-keyar-50 p-2.5 text-keyar-700"><Building2 size={19} /></div><div><h2 className="font-bold">Business identity</h2><p className="text-xs text-slate-500">Used for tax calculation, invoice branding, and supplier details.</p></div></div>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{SETTING_FIELDS.slice(0, 9).map(([name, label, type, required]) => <div key={name} className={type === "textarea" ? "sm:col-span-2" : ""}><Field label={label} name={name} type={type === "textarea" ? "text" : type} rows={type === "textarea" ? 3 : undefined} value={form[name]} required={required} onChange={(event) => setForm({ ...form, [name]: event.target.value })} /></div>)}
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{SETTING_FIELDS.slice(0, 9).map(([name, label, type, required]) => <div key={name} className={type === "textarea" ? "sm:col-span-2" : ""}><Field label={label} name={name} type={type === "textarea" ? "text" : type} rows={type === "textarea" ? 3 : undefined} maxLength={name === "pincode" ? 6 : undefined} inputMode={name === "pincode" ? "numeric" : undefined} value={form[name]} required={required} onChange={(event) => setForm({ ...form, [name]: name === "pincode" ? event.target.value.replace(/\D/g, "").slice(0, 6) : event.target.value })} /></div>)}
           <div className="sm:col-span-2 lg:col-span-3"><span className="form-label">Company logo</span><div className="flex flex-wrap items-center gap-4 rounded-lg border border-dashed border-slate-300 p-4">
             {form.logo_data ? <img src={form.logo_data} alt="Company logo preview" className="h-14 max-w-40 object-contain" /> : <img src="/keyar-logo.png" alt="Keyar logo" className="h-14 w-28 object-contain" />}
             <div className="flex-1"><input aria-label="Upload company logo" type="file" accept="image/png,image/jpeg" className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-keyar-50 file:px-3 file:py-2 file:font-semibold file:text-keyar-800" onChange={(event) => {

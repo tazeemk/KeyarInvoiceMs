@@ -23,8 +23,28 @@ GSTIN_PATTERN = re.compile(r"\d{2}[A-Z]{5}\d{4}[A-Z][A-Z0-9]Z[A-Z0-9]")
 class CustomerSerializer(serializers.ModelSerializer):
     class Meta:
         model = Customer
-        fields = ("id", "name", "address", "gstin", "state", "state_code", "mobile", "created_at")
+        fields = ("id", "name", "address", "gstin", "state", "state_code", "pincode", "mobile", "created_at")
         read_only_fields = ("id", "created_at")
+
+    def to_internal_value(self, data):
+        data = data.copy()
+        for field in ("name", "address", "gstin", "state", "state_code", "pincode", "mobile"):
+            if field in data and data.get(field) is None:
+                data[field] = ""
+        return super().to_internal_value(data)
+
+    def validate_pincode(self, value):
+        value = value.strip()
+        if value and not re.fullmatch(r"\d{6}", value):
+            raise serializers.ValidationError("Enter a valid six-digit PIN code.")
+        return value
+
+    def validate(self, attrs):
+        state_code = attrs.get("state_code", getattr(self.instance, "state_code", ""))
+        gstin = attrs.get("gstin", getattr(self.instance, "gstin", ""))
+        if not state_code and GSTIN_PATTERN.fullmatch(gstin or ""):
+            attrs["state_code"] = gstin[:2]
+        return attrs
 
 
 class ProductSerializer(serializers.ModelSerializer):
@@ -59,7 +79,16 @@ class CompanySettingsSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Enter a valid two-digit Indian state code.")
         return value
 
+    def validate_pincode(self, value):
+        value = value.strip()
+        if value and not re.fullmatch(r"\d{6}", value):
+            raise serializers.ValidationError("Enter a valid six-digit PIN code.")
+        return value
+
     def validate(self, attrs):
+        pincode = attrs.get("pincode", getattr(self.instance, "pincode", ""))
+        if "pincode" in attrs and not pincode:
+            raise serializers.ValidationError({"pincode": "Enter a six-digit PIN code."})
         gstin = attrs.get("gstin", getattr(self.instance, "gstin", ""))
         state_code = attrs.get("state_code", getattr(self.instance, "state_code", ""))
         if gstin and gstin != "GSTIN PENDING" and len(gstin) == 15 and state_code and gstin[:2] != state_code:
@@ -123,9 +152,9 @@ class InvoiceSerializer(serializers.ModelSerializer):
         model = Invoice
         fields = (
             "id", "invoice_number", "invoice_date", "due_date", "customer", "customer_name",
-            "customer_address", "customer_gstin", "customer_state", "customer_state_code",
+            "customer_address", "customer_gstin", "customer_state", "customer_state_code", "customer_pincode",
             "customer_mobile", "customer_email", "supplier_name", "supplier_brand",
-            "supplier_address", "supplier_gstin", "supplier_state", "supplier_state_code",
+            "supplier_address", "supplier_gstin", "supplier_state", "supplier_state_code", "supplier_pincode",
             "supplier_phone", "supplier_email", "supplier_bank_name", "supplier_bank_account",
             "supplier_bank_ifsc", "supplier_bank_branch", "supplier_logo_data", "supplier_footer",
             "place_of_supply", "vehicle_number", "mobile_number", "notes", "taxable_total",
@@ -136,9 +165,9 @@ class InvoiceSerializer(serializers.ModelSerializer):
             "id", "invoice_number", "taxable_total", "cgst_total", "sgst_total",
             "igst_total", "grand_total", "amount_in_words", "created_by", "created_at",
             "customer_name", "customer_address", "customer_gstin", "customer_state",
-            "customer_state_code", "customer_mobile", "customer_email", "supplier_name",
+            "customer_state_code", "customer_pincode", "customer_mobile", "customer_email", "supplier_name",
             "supplier_brand", "supplier_address", "supplier_gstin", "supplier_state",
-            "supplier_state_code", "supplier_phone", "supplier_email", "supplier_bank_name",
+            "supplier_state_code", "supplier_pincode", "supplier_phone", "supplier_email", "supplier_bank_name",
             "supplier_bank_account", "supplier_bank_ifsc", "supplier_bank_branch",
             "supplier_logo_data", "supplier_footer",
         )
@@ -165,10 +194,12 @@ class InvoiceSerializer(serializers.ModelSerializer):
             **validated_data, invoice_number=number, created_by=self.context["request"].user,
             customer_name=customer.name, customer_address=customer.address, customer_gstin=customer.gstin,
             customer_state=customer.state, customer_state_code=customer.state_code,
+            customer_pincode=customer.pincode,
             customer_mobile=customer.mobile, customer_email=customer.email,
             supplier_name=settings.company_name, supplier_brand=settings.brand_name,
             supplier_address=settings.address, supplier_gstin=settings.gstin,
             supplier_state=settings.state, supplier_state_code=settings.state_code,
+            supplier_pincode=settings.pincode,
             supplier_phone=settings.phone, supplier_email=settings.email,
             supplier_bank_name=settings.bank_name, supplier_bank_account=settings.bank_account,
             supplier_bank_ifsc=settings.bank_ifsc, supplier_bank_branch=settings.bank_branch,
@@ -190,6 +221,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
             instance.customer_gstin = customer.gstin
             instance.customer_state = customer.state
             instance.customer_state_code = customer.state_code
+            instance.customer_pincode = customer.pincode
             instance.customer_mobile = customer.mobile
             instance.customer_email = customer.email
         instance.save()
@@ -210,7 +242,13 @@ class InvoiceSerializer(serializers.ModelSerializer):
     @staticmethod
     def _replace_items(invoice, item_data, company, customer):
         customer_state_code = invoice.customer_state_code or customer.state_code
-        interstate = (invoice.supplier_state_code or company.state_code) != customer_state_code
+        supplier_state_code = invoice.supplier_state_code or company.state_code
+        if supplier_state_code and supplier_state_code != "00" and customer_state_code:
+            interstate = supplier_state_code != customer_state_code
+        else:
+            supplier_state = invoice.supplier_state or company.state
+            customer_state = invoice.customer_state or customer.state
+            interstate = supplier_state.strip().casefold() != customer_state.strip().casefold()
         taxable = cgst_total = sgst_total = igst_total = Decimal("0")
         for item in item_data:
             product = item["product"]

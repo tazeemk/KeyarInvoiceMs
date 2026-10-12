@@ -7,11 +7,11 @@ import { colors } from "../theme";
 import { getApiMessage, money } from "../utils/money";
 
 const CUSTOMER_FIELDS = [
-  ["name", "Customer name", "text", true],
+  ["name", "Customer name", "text", false],
   ["gstin", "GSTIN", "text", false],
   ["address", "Address", "text", false, true],
-  ["state", "State", "text", true],
-  ["state_code", "State code", "number", true],
+  ["state", "State", "text", false],
+  ["pincode", "PIN code", "number-pad", false],
   ["mobile", "Mobile number", "phone-pad", false],
 ];
 
@@ -51,7 +51,7 @@ export default function RecordsScreen({ kind, navigation }) {
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const initial = useMemo(() => isCustomer
-    ? { name: "", address: "", gstin: "", state: "", state_code: "", mobile: "" }
+    ? { name: "", address: "", gstin: "", state: "", state_code: "", pincode: "", mobile: "" }
     : { name: "", hsn_code: "", size: "", colour: "", unit: "PCS", default_price: "", gst_rate: "18.00", active: true }, [isCustomer]);
 
   async function save() {
@@ -64,7 +64,11 @@ export default function RecordsScreen({ kind, navigation }) {
     const payload = { ...editing };
     delete payload.id;
     delete payload.created_at;
-    if (!isCustomer) {
+    if (isCustomer) {
+      for (const key of ["name", "address", "gstin", "state", "state_code", "pincode", "mobile"]) {
+        payload[key] = payload[key] ?? "";
+      }
+    } else {
       payload.default_price = Number(payload.default_price);
       payload.gst_rate = Number(payload.gst_rate);
     }
@@ -94,15 +98,15 @@ export default function RecordsScreen({ kind, navigation }) {
   return (
     <Page>
       <Header title={title} subtitle={isCustomer ? "Billing contacts and GST details." : "Prices, HSN codes, and default GST rates."} right={<Pressable accessibilityRole="button" style={styles.addButton} onPress={() => setEditing({ ...initial })}><Text style={styles.addText}>＋ Add</Text></Pressable>} />
-      <SearchInput value={search} onChangeText={setSearch} placeholder={isCustomer ? "Search name, GSTIN, mobile" : "Search product or HSN"} />
+      <SearchInput value={search} onChangeText={setSearch} placeholder={isCustomer ? "Search name, GSTIN, PIN, mobile" : "Search product or HSN"} />
       {!!error && <Text style={styles.error}>{error}</Text>}
       {busy ? <Loading label={`Loading ${title.toLowerCase()}…`} /> : rows.length ? rows.map((row) => (
         <Card key={row.id} style={styles.record}>
           <View style={styles.rowTop}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.name}>{row.name}</Text>
+              <Text style={styles.name}>{row.name || (isCustomer ? "Unnamed customer" : "Unnamed product")}</Text>
               {isCustomer
-                ? <Text style={styles.meta}>{[row.state, row.state_code].filter(Boolean).join(" · ") || "State not set"}</Text>
+                ? <Text style={styles.meta}>{[row.state, row.pincode ? `PIN ${row.pincode}` : ""].filter(Boolean).join(" · ") || "State not set"}</Text>
                 : <Text style={styles.meta}>HSN {row.hsn_code || "—"} · {row.size || row.unit || "No size"}</Text>}
             </View>
             <View style={styles.actions}>
@@ -118,8 +122,8 @@ export default function RecordsScreen({ kind, navigation }) {
       <FormModal visible={Boolean(editing)} title={`${editing?.id ? "Edit" : "Add"} ${isCustomer ? "customer" : "product"}`} onClose={() => setEditing(null)}>
         {editing && <>
           {fields.map(([key, label, keyboardType, required, multiline]) => (
-            <Input key={key} label={label} value={editing[key]} required={required} keyboardType={keyboardType === "text" ? undefined : keyboardType} multiline={multiline} autoCapitalize={key === "gstin" || key === "hsn_code" || key === "state_code" ? "characters" : undefined}
-              onChangeText={(value) => setEditing((current) => ({ ...current, [key]: value }))} />
+            <Input key={key} label={label} value={editing[key]} required={required} keyboardType={keyboardType === "text" ? undefined : keyboardType} multiline={multiline} maxLength={key === "pincode" ? 6 : undefined} autoCapitalize={key === "gstin" || key === "hsn_code" ? "characters" : undefined}
+              onChangeText={(value) => setEditing((current) => ({ ...current, [key]: key === "pincode" ? value.replace(/\D/g, "").slice(0, 6) : value }))} />
           ))}
           {!isCustomer && <View style={styles.switchRow}><Text style={styles.switchLabel}>Available for new invoices</Text><Switch value={editing.active !== false} onValueChange={(active) => setEditing((current) => ({ ...current, active }))} trackColor={{ true: colors.teal }} /></View>}
           <Button title={saving ? "Saving…" : "Save record"} onPress={save} loading={saving} />

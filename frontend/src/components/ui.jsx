@@ -1,10 +1,10 @@
 import { useEffect } from "react";
 import { AlertCircle, Check, X } from "lucide-react";
 
-export function Field({ label, name, value, onChange, type = "text", required = false, placeholder = "", options, rows, min, max, step, disabled, autoComplete }) {
+export function Field({ label, name, value, onChange, type = "text", required = false, placeholder = "", options, rows, min, max, maxLength, inputMode, step, disabled, autoComplete }) {
   const common = {
     id: name, name, value: value ?? "", onChange,
-    required, placeholder, disabled, min, max, step, autoComplete, className: "form-field",
+    required, placeholder, disabled, min, max, maxLength, inputMode, step, autoComplete, className: "form-field",
     "aria-label": label,
   };
   return <label className="block">

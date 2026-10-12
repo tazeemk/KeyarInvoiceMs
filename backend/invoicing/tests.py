@@ -14,9 +14,9 @@ class InvoiceApiTests(TestCase):
         self.staff = get_user_model().objects.create_user(username="staff", password="Strong-pass-123")
         self.client = APIClient()
         self.client.force_authenticate(self.staff)
-        CompanySettings.objects.create(pk=1, state="Maharashtra", state_code="27")
+        CompanySettings.objects.create(pk=1, state="Maharashtra", state_code="27", pincode="400001")
         self.customer = Customer.objects.create(
-            name="Local Buyer", address="Buyer address", state="Maharashtra", state_code="27",
+            name="Local Buyer", address="Buyer address", state="Maharashtra", state_code="27", pincode="400001",
         )
         self.product = Product.objects.create(
             name="Sample Product", hsn_code="123456", unit="KGS",
@@ -37,6 +37,10 @@ class InvoiceApiTests(TestCase):
         self.assertEqual(invoice.sgst_total, Decimal("18.00"))
         self.assertEqual(invoice.igst_total, Decimal("0.00"))
         self.assertEqual(invoice.grand_total, Decimal("236.00"))
+        self.assertEqual(invoice.customer_pincode, "400001")
+        self.assertEqual(invoice.supplier_pincode, "400001")
+        self.assertEqual(response.data["customer_pincode"], "400001")
+        self.assertEqual(response.data["supplier_pincode"], "400001")
 
     def test_interstate_invoice_uses_igst(self):
         self.customer.state = "Delhi"
@@ -85,12 +89,73 @@ class InvoiceApiTests(TestCase):
             "name": "Buyer with non-standard GSTIN",
             "gstin": "8712345678876",
             "state": "Maharashtra",
-            "state_code": "91",
+            "pincode": "012345",
         }, format="json")
         self.assertEqual(response.status_code, 201, response.data)
         self.assertNotIn("email", response.data)
         self.assertEqual(response.data["gstin"], "8712345678876")
-        self.assertEqual(response.data["state_code"], "91")
+        self.assertEqual(response.data["pincode"], "012345")
+        self.assertEqual(response.data["state_code"], "")
+
+    def test_customer_optional_fields_accept_blank_and_null(self):
+        response = self.client.post("/api/customers/", {
+            "name": "",
+            "address": None,
+            "gstin": "",
+            "state": None,
+            "state_code": "",
+            "pincode": "",
+            "mobile": None,
+        }, format="json")
+        self.assertEqual(response.status_code, 201, response.data)
+        customer = Customer.objects.get(pk=response.data["id"])
+        self.assertEqual(customer.name, "")
+        self.assertEqual(customer.address, "")
+        self.assertEqual(customer.state, "")
+        self.assertEqual(customer.pincode, "")
+
+    def test_customer_rejects_invalid_nonempty_pincode(self):
+        response = self.client.post("/api/customers/", {
+            "name": "Buyer with invalid PIN",
+            "state": "Maharashtra",
+            "pincode": "12345",
+        }, format="json")
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("pincode", response.data)
+
+    def test_customer_partial_update_preserves_omitted_fields(self):
+        response = self.client.patch(
+            f"/api/customers/{self.customer.id}/",
+            {"mobile": ""},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.customer.refresh_from_db()
+        self.assertEqual(self.customer.name, "Local Buyer")
+        self.assertEqual(self.customer.state, "Maharashtra")
+        self.assertEqual(self.customer.pincode, "400001")
+
+    def test_company_settings_requires_six_digit_pincode(self):
+        self.client.force_authenticate(self.admin)
+        invalid = self.client.patch("/api/settings/", {"pincode": "12345"}, format="json")
+        self.assertEqual(invalid.status_code, 400)
+        self.assertIn("pincode", invalid.data)
+        valid = self.client.patch("/api/settings/", {"pincode": "123456"}, format="json")
+        self.assertEqual(valid.status_code, 200, valid.data)
+
+    def test_customer_without_state_code_uses_state_name_for_tax(self):
+        self.customer.state_code = ""
+        self.customer.save()
+        response = self.client.post("/api/invoices/", {
+            "customer": self.customer.id,
+            "invoice_date": "2026-06-29",
+            "items": [{"product": self.product.id, "quantity": "1", "rate": "100"}],
+        }, format="json")
+        self.assertEqual(response.status_code, 201, response.data)
+        invoice = Invoice.objects.get(pk=response.data["id"])
+        self.assertEqual(invoice.cgst_total, Decimal("9.00"))
+        self.assertEqual(invoice.sgst_total, Decimal("9.00"))
+        self.assertEqual(invoice.igst_total, Decimal("0.00"))
 
     def test_admin_user_management_hashes_passwords_and_assigns_roles(self):
         self.client.force_authenticate(self.admin)
@@ -116,6 +181,31 @@ class InvoiceApiTests(TestCase):
         self.customer.name = "Changed Buyer Name"
         self.customer.save()
         self.assertEqual(self.client.get(f"/api/invoices/{response.data['id']}/").data["customer_name"], "Local Buyer")
+
+    def test_invoice_created_for_customer_with_blank_optional_fields_is_listed_and_retrievable(self):
+        customer_response = self.client.post("/api/customers/", {
+            "name": None,
+            "state": "",
+            "pincode": "",
+        }, format="json")
+        self.assertEqual(customer_response.status_code, 201, customer_response.data)
+
+        created = self.client.post("/api/invoices/", {
+            "customer": customer_response.data["id"],
+            "invoice_date": "2026-06-29",
+            "items": [{"product": self.product.id, "quantity": "1", "rate": "100"}],
+        }, format="json")
+        self.assertEqual(created.status_code, 201, created.data)
+
+        details = self.client.get(f"/api/invoices/{created.data['id']}/")
+        self.assertEqual(details.status_code, 200, details.data)
+        self.assertEqual(details.data["invoice_number"], created.data["invoice_number"])
+        self.assertEqual(details.data["lines"][0]["description"], self.product.name)
+
+        listed = self.client.get("/api/invoices/")
+        self.assertEqual(listed.status_code, 200)
+        listed_rows = listed.data.get("results", listed.data)
+        self.assertTrue(any(row["id"] == created.data["id"] for row in listed_rows))
 
     def test_refresh_token_can_be_reused_until_expiration(self):
         from rest_framework_simplejwt.tokens import RefreshToken

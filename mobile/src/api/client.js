@@ -1,15 +1,14 @@
 import axios from "axios";
 import Constants from "expo-constants";
 import * as SecureStore from "expo-secure-store";
+import { resolveApiBaseUrl } from "./config";
 
-const configuredUrl =
-  process.env.EXPO_PUBLIC_API_URL ||
-  Constants.expoConfig?.extra?.apiUrl ||
-  "http://10.0.2.2:8000/api/";
-
-export const API_BASE_URL = `${configuredUrl.replace(/\/+$/, "")}/`;
-export const api = axios.create({ baseURL: API_BASE_URL, timeout: 25000 });
-const authApi = axios.create({ baseURL: API_BASE_URL, timeout: 25000 });
+export const API_BASE_URL = resolveApiBaseUrl(
+  process.env.EXPO_PUBLIC_API_URL,
+  Constants.expoConfig?.extra?.apiUrl,
+);
+export const api = axios.create({ baseURL: API_BASE_URL, timeout: 90000 });
+const authApi = axios.create({ baseURL: API_BASE_URL, timeout: 90000 });
 
 let refreshRequest;
 let onSessionExpired = () => {};

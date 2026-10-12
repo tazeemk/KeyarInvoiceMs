@@ -30,7 +30,7 @@ class HealthView(APIView):
 class CustomerViewSet(viewsets.ModelViewSet):
     queryset = Customer.objects.all()
     serializer_class = CustomerSerializer
-    search_fields = ["name", "gstin", "mobile"]
+    search_fields = ["name", "gstin", "mobile", "pincode"]
     ordering_fields = ["name", "created_at"]
 
 

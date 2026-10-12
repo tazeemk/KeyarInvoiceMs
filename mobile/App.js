@@ -1,10 +1,10 @@
 import { useEffect } from "react";
-import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Platform, StyleSheet, Text, View } from "react-native";
 import { NavigationContainer, DefaultTheme } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { StatusBar } from "expo-status-bar";
-import { SafeAreaProvider } from "react-native-safe-area-context";
+import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 import { AuthProvider, useAuth } from "./src/auth/AuthContext";
 import DashboardScreen from "./src/screens/DashboardScreen";
 import InvoiceDetailsScreen, { InvoiceFormScreen, InvoiceListScreen } from "./src/screens/InvoicesScreen";
@@ -28,6 +28,7 @@ const tabConfig = {
 
 function WorkspaceTabs() {
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
   return (
     <Tabs.Navigator
       screenOptions={({ route }) => ({
@@ -35,7 +36,7 @@ function WorkspaceTabs() {
         tabBarActiveTintColor: colors.teal,
         tabBarInactiveTintColor: colors.muted,
         tabBarLabelStyle: { fontSize: 10, fontWeight: "700", marginBottom: 2 },
-        tabBarStyle: { height: 63, paddingTop: 7, borderTopColor: colors.line, backgroundColor: colors.white },
+        tabBarStyle: { height: 63 + insets.bottom, paddingTop: 7, paddingBottom: insets.bottom, borderTopColor: colors.line, backgroundColor: colors.white },
         tabBarIcon: ({ color }) => <Text style={{ fontSize: route.name === "More" ? 16 : 22, lineHeight: 24, color, fontWeight: "700" }}>{tabConfig[route.name].glyph}</Text>,
       })}
     >
@@ -67,7 +68,7 @@ function AppNavigator() {
         {user ? <>
           <Stack.Screen name="Workspace" component={WorkspaceTabs} options={{ headerShown: false }} />
           <Stack.Screen name="InvoiceDetails" component={InvoiceDetailsScreen} options={{ headerShown: false, presentation: "card" }} />
-          <Stack.Screen name="InvoiceForm" component={InvoiceFormScreen} options={{ headerShown: false, presentation: "modal" }} />
+          <Stack.Screen name="InvoiceForm" component={InvoiceFormScreen} options={{ headerShown: false, presentation: Platform.OS === "ios" ? "modal" : "card" }} />
           <Stack.Screen name="Settings" component={SettingsScreen} options={{ headerShown: false }} />
           {isAdmin && <Stack.Screen name="Users" component={UsersScreen} options={{ headerShown: false }} />}
         </> : <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false, animationTypeForReplace: "pop" }} />}

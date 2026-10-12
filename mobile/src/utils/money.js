@@ -5,6 +5,12 @@ export const money = (value) =>
     maximumFractionDigits: 2,
   }).format(Number(value || 0));
 
+export function isInterstate(supplier, customer) {
+  const supplierCode = supplier.state_code && supplier.state_code !== "00" ? supplier.state_code : "";
+  if (supplierCode && customer.state_code) return supplierCode !== customer.state_code;
+  return supplier.state.trim().toLocaleLowerCase() !== customer.state.trim().toLocaleLowerCase();
+}
+
 export function calculateLines(lines, interstate) {
   const result = lines.reduce(
     (total, line) => {
@@ -32,6 +38,12 @@ export function getApiMessage(error) {
   if (data && typeof data === "object") {
     const first = Object.values(data).flat(Infinity).find((value) => typeof value === "string");
     if (first) return first;
+  }
+  if (error?.code === "ECONNABORTED" || /timeout/i.test(error?.message || "")) {
+    return "The Keyar server is taking longer than usual to respond. Check your connection and try again.";
+  }
+  if (error?.code === "ERR_NETWORK" || error?.message === "Network Error") {
+    return "Could not reach the Keyar server. Check that your internet connection and mobile data are available, then try again.";
   }
   return error?.message || "Something went wrong. Please try again.";
 }

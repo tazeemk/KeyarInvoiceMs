@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculateLines, money } from "./money";
+import { calculateLines, getApiMessage, isInterstate, money } from "./money";
 
 describe("mobile invoice totals", () => {
   it("splits local GST per line using paise precision", () => {
@@ -24,5 +24,21 @@ describe("mobile invoice totals", () => {
 
   it("formats INR using Indian numbering", () => {
     expect(money("37465.5")).toContain("37,465.50");
+  });
+
+  it("uses state names when a state code is unavailable", () => {
+    expect(isInterstate(
+      { state: "Maharashtra", state_code: "27" },
+      { state: " Maharashtra ", state_code: "" },
+    )).toBe(false);
+    expect(isInterstate(
+      { state: "Maharashtra", state_code: "27" },
+      { state: "Delhi", state_code: "" },
+    )).toBe(true);
+  });
+
+  it("explains unreachable and slow API connections", () => {
+    expect(getApiMessage({ message: "Network Error", code: "ERR_NETWORK" })).toContain("mobile data");
+    expect(getApiMessage({ message: "timeout of 90000ms exceeded", code: "ECONNABORTED" })).toContain("taking longer");
   });
 });

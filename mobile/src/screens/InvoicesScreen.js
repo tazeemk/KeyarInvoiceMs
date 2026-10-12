@@ -5,7 +5,7 @@ import { api, fetchAll } from "../api/client";
 import { printInvoicePdf, saveInvoicePdf, shareInvoicePdf } from "../api/invoices";
 import { Button, Card, Empty, FormModal, Header, Input, Loading, Page, SearchInput, confirmAction } from "../components/UI";
 import { colors } from "../theme";
-import { calculateLines, getApiMessage, money } from "../utils/money";
+import { calculateLines, getApiMessage, isInterstate, money } from "../utils/money";
 
 function localDate() {
   const now = new Date();
@@ -34,14 +34,37 @@ export function InvoiceListScreen({ navigation, route }) {
   useFocusEffect(useCallback(() => { load(); }, [load]));
   useEffect(() => {
     if (route.params?.invoiceId) {
-      navigation.getParent()?.navigate("InvoiceDetails", { invoiceId: route.params.invoiceId });
+      const stackNavigation = navigation.getParent();
+      if (!stackNavigation) {
+        setError("Invoice navigation is unavailable. Return to the workspace and try again.");
+        return;
+      }
+      stackNavigation.navigate("InvoiceDetails", { invoiceId: route.params.invoiceId });
       navigation.setParams({ invoiceId: undefined });
     }
   }, [navigation, route.params?.invoiceId]);
 
+  function openInvoice(invoiceId) {
+    const stackNavigation = navigation.getParent();
+    if (!stackNavigation) {
+      setError("Invoice navigation is unavailable. Return to the workspace and try again.");
+      return;
+    }
+    stackNavigation.navigate("InvoiceDetails", { invoiceId });
+  }
+
+  function openInvoiceForm() {
+    const stackNavigation = navigation.getParent();
+    if (!stackNavigation) {
+      setError("Invoice navigation is unavailable. Return to the workspace and try again.");
+      return;
+    }
+    stackNavigation.navigate("InvoiceForm");
+  }
+
   return (
     <Page>
-      <Header title="Invoices" subtitle="Search, review, and share your tax invoices." right={<Pressable style={styles.addButton} onPress={() => navigation.getParent()?.navigate("InvoiceForm")}><Text style={styles.addText}>＋ New</Text></Pressable>} />
+      <Header title="Invoices" subtitle="Search, review, and share your tax invoices." right={<Pressable accessibilityRole="button" style={styles.addButton} onPress={openInvoiceForm}><Text style={styles.addText}>＋ New</Text></Pressable>} />
       <SearchInput value={search} onChangeText={setSearch} placeholder="Invoice number or customer" />
       <View style={styles.filters}>
         <Input label="From date" value={from} onChangeText={setFrom} placeholder="YYYY-MM-DD" autoCapitalize="none" style={styles.dateInput} />
@@ -49,9 +72,9 @@ export function InvoiceListScreen({ navigation, route }) {
       </View>
       {!!error && <Text style={styles.error}>{error}</Text>}
       {busy ? <Loading label="Loading invoices…" /> : rows.length ? rows.map((invoice) => (
-        <Card key={invoice.id} onPress={() => navigation.getParent()?.navigate("InvoiceDetails", { invoiceId: invoice.id })} style={styles.invoice}>
+        <Card key={invoice.id} onPress={() => openInvoice(invoice.id)} style={styles.invoice}>
           <View style={styles.invoiceTop}><Text style={styles.number}>{invoice.invoice_number}</Text><Text style={styles.amount}>{money(invoice.grand_total)}</Text></View>
-          <Text style={styles.customer}>{invoice.customer_name}</Text>
+          <Text style={styles.customer}>{invoice.customer_name || "Unnamed customer"}</Text>
           <View style={styles.bottomRow}>
             <Text style={styles.date}>{invoice.invoice_date} · {invoice.place_of_supply || "Supply location not set"}</Text>
             <View style={styles.badge}><Text style={styles.badgeText}>ISSUED</Text></View>
@@ -63,12 +86,17 @@ export function InvoiceListScreen({ navigation, route }) {
 }
 
 export function InvoiceDetailsScreen({ navigation, route }) {
-  const { invoiceId } = route.params;
+  const invoiceId = route.params?.invoiceId;
   const [invoice, setInvoice] = useState(null);
   const [busy, setBusy] = useState(true);
   const [working, setWorking] = useState(false);
   const [error, setError] = useState("");
   const load = useCallback(async () => {
+    if (!invoiceId) {
+      setError("The invoice could not be opened because its ID is missing. Return to the invoice list and try again.");
+      setBusy(false);
+      return;
+    }
     setBusy(true);
     try {
       const { data } = await api.get(`invoices/${invoiceId}/`);
@@ -110,14 +138,20 @@ export function InvoiceDetailsScreen({ navigation, route }) {
   }
 
   if (busy) return <Page><Loading label="Loading invoice…" /></Page>;
-  if (!invoice) return <Page><Header title="Invoice" /><Empty title="Invoice unavailable" subtitle={error || "This invoice could not be loaded."} /></Page>;
+  if (!invoice) return (
+    <Page>
+      <Header title="Invoice" right={<Pressable accessibilityRole="button" style={styles.addButton} onPress={() => navigation.goBack()}><Text style={styles.addText}>Back</Text></Pressable>} />
+      <Empty title="Invoice unavailable" subtitle={error || "This invoice could not be loaded."} />
+      {!!invoiceId && <Button title="Retry" variant="secondary" onPress={load} />}
+    </Page>
+  );
   const interstate = Number(invoice.igst_total) > 0;
 
   return (
     <Page>
-      <Header title="Invoice details" subtitle={invoice.invoice_number} />
+      <Header title="Invoice details" subtitle={invoice.invoice_number} right={<Pressable accessibilityRole="button" style={styles.addButton} onPress={() => navigation.goBack()}><Text style={styles.addText}>Back</Text></Pressable>} />
       <Card style={styles.summary}>
-        <Text style={styles.invoiceName}>{invoice.customer_name}</Text>
+        <Text style={styles.invoiceName}>{invoice.customer_name || "Unnamed customer"}</Text>
         <Text style={styles.detail}>{invoice.customer_address || "Customer address not set"}</Text>
         <Text style={styles.detail}>{invoice.invoice_date}{invoice.due_date ? ` · Due ${invoice.due_date}` : ""}</Text>
         <Text style={styles.detail}>Place of supply: {invoice.place_of_supply || invoice.customer_state || "Not set"}</Text>
@@ -208,7 +242,7 @@ export function InvoiceFormScreen({ navigation, route }) {
   }, []);
 
   const customer = customers.find((item) => String(item.id) === form.customer);
-  const interstate = Boolean(company && customer && company.state_code !== customer.state_code);
+  const interstate = Boolean(company && customer && isInterstate(company, customer));
   const lines = form.items.map((line) => {
     const product = products.find((item) => String(item.id) === line.product);
     return { ...line, gst_rate: line.gst_rate === "" ? Number(product?.gst_rate || 0) : Number(line.gst_rate) };
@@ -273,12 +307,12 @@ export function InvoiceFormScreen({ navigation, route }) {
 
   return (
     <Page>
-      <Header title={id ? "Edit invoice" : "New invoice"} subtitle={invoice_number || "Create a tax invoice"} />
+      <Header title={id ? "Edit invoice" : "New invoice"} subtitle={invoice_number || "Create a tax invoice"} right={<Pressable accessibilityRole="button" style={styles.addButton} onPress={() => navigation.goBack()}><Text style={styles.addText}>Back</Text></Pressable>} />
       {!!error && <Text style={styles.error}>{error}</Text>}
       <Card style={styles.formCard}>
         <Text style={styles.section}>Customer & dates</Text>
         <Text style={styles.formLabel}>CUSTOMER *</Text>
-        <ChoiceButton label={customer ? `${customer.name} · ${customer.state_code}` : "Choose customer"} onPress={() => setProductPicker({ type: "customer" })} />
+        <ChoiceButton label={customer ? `${customer.name || "Unnamed customer"} · ${customer.state || "State not set"} · PIN ${customer.pincode || "not set"}` : "Choose customer"} onPress={() => setProductPicker({ type: "customer" })} />
         <Input label="Invoice date (YYYY-MM-DD)" value={form.invoice_date} onChangeText={(invoice_date) => setForm((current) => ({ ...current, invoice_date }))} autoCapitalize="none" />
         <Input label="Due date (YYYY-MM-DD)" value={form.due_date} onChangeText={(due_date) => setForm((current) => ({ ...current, due_date }))} autoCapitalize="none" />
         <Input label="Vehicle number" value={form.vehicle_number} onChangeText={(vehicle_number) => setForm((current) => ({ ...current, vehicle_number }))} />
@@ -312,8 +346,8 @@ export function InvoiceFormScreen({ navigation, route }) {
       <FormModal visible={Boolean(productPicker)} title={productPicker?.type === "customer" ? "Choose customer" : "Choose product"} onClose={() => setProductPicker(null)}>
         {(productPicker?.type === "customer" ? customers : products).map((item) => (
           <Pressable key={item.id} onPress={() => productPicker.type === "customer" ? (setForm((current) => ({ ...current, customer: String(item.id) })), setProductPicker(null)) : chooseProduct(productPicker.index, item)} style={styles.pickerRow}>
-            <Text style={styles.pickerTitle}>{item.name}</Text>
-            <Text style={styles.pickerMeta}>{productPicker.type === "customer" ? `${item.state || "State unset"} · ${item.state_code || "—"}` : `HSN ${item.hsn_code} · ${money(item.default_price)} · GST ${item.gst_rate}%`}</Text>
+            <Text style={styles.pickerTitle}>{item.name || (productPicker.type === "customer" ? "Unnamed customer" : "Unnamed product")}</Text>
+            <Text style={styles.pickerMeta}>{productPicker.type === "customer" ? `${item.state || "State unset"} · PIN ${item.pincode || "—"}` : `HSN ${item.hsn_code} · ${money(item.default_price)} · GST ${item.gst_rate}%`}</Text>
           </Pressable>
         ))}
         {!(productPicker?.type === "customer" ? customers : products).length && <Empty title="No records available" subtitle="Add customers and active products before creating an invoice." />}

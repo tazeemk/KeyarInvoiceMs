@@ -12,7 +12,7 @@ const FIELDS = [
   ["address", "Registered address", "text", true, true],
   ["gstin", "GSTIN", "text", true],
   ["state", "State", "text", true],
-  ["state_code", "State code", "number", true],
+  ["pincode", "PIN code", "number-pad", true],
   ["phone", "Company phone", "phone-pad", false],
   ["email", "Accounts email", "email-address", false],
   ["invoice_prefix", "Invoice prefix", "text", true],
@@ -64,8 +64,9 @@ export default function SettingsScreen() {
       {!isAdmin && <Card><Text style={styles.readOnly}>You can view settings, but only an Admin can change them.</Text></Card>}
       {FIELDS.map(([key, label, keyboardType, required, multiline]) => (
         <Input key={key} label={label} value={form[key]} required={required} editable={isAdmin} keyboardType={keyboardType === "characters" ? "default" : keyboardType} multiline={multiline}
-          autoCapitalize={["gstin", "bank_ifsc", "state_code"].includes(key) ? "characters" : key === "email" ? "none" : undefined}
-          onChangeText={(value) => setForm((current) => ({ ...current, [key]: value }))} />
+          maxLength={key === "pincode" ? 6 : undefined}
+          autoCapitalize={["gstin", "bank_ifsc"].includes(key) ? "characters" : key === "email" ? "none" : undefined}
+          onChangeText={(value) => setForm((current) => ({ ...current, [key]: key === "pincode" ? value.replace(/\D/g, "").slice(0, 6) : value }))} />
       ))}
       {isAdmin && <Button title={saving ? "Saving…" : "Save company settings"} onPress={save} loading={saving} />}
     </Page>
