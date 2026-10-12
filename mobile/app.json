@@ -6,9 +6,14 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
+    "icon": "./assets/keyar-app-icon.png",
     "assetBundlePatterns": ["**/*"],
     "android": {
       "package": "com.namastess.keyarinvoices",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/keyar-app-icon.png",
+        "backgroundColor": "#ffffff"
+      },
       "permissions": ["INTERNET"]
     },
     "ios": {

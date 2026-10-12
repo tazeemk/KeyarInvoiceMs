@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Activity, ArrowDownToLine, ArrowLeft, ArrowUpRight, BadgeIndianRupee, Bell, Boxes,
   Building2, CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight, ClipboardList,
-  FilePlus2, FileText, LayoutDashboard, LogOut, Menu, Package, PanelLeftClose, Pencil,
+  Eye, EyeOff, FilePlus2, FileText, LayoutDashboard, LogOut, Menu, Package, PanelLeftClose, Pencil,
   Plus, Search, Settings, ShieldCheck, Trash2, UserRound, Users, X,
 } from "lucide-react";
 import api, { downloadInvoicePdf, signIn, signOut } from "./api";
@@ -48,6 +48,7 @@ function Login({ onLogin }) {
   const [form, setForm] = useState({ username: "", password: "" });
   const [error, setError] = useState("");
   const [working, setWorking] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   async function submit(event) {
     event.preventDefault();
     setError("");
@@ -64,14 +65,22 @@ function Login({ onLogin }) {
   return <main className="flex min-h-screen bg-white">
     <section className="flex w-full items-center justify-center px-6 py-12 lg:w-[48%]">
       <div className="w-full max-w-md">
-        <div className="mb-12 flex items-center gap-3"><div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-keyar-900 text-xl font-black tracking-tight text-white">K</div><div><p className="text-xl font-extrabold tracking-tight text-keyar-900">KEYAR</p><p className="text-xs font-medium text-slate-500">Invoice management</p></div></div>
+        <div className="mb-12"><img src="/keyar-logo.png" alt="Keyar — A Clean Place Is A Safe Place" className="h-20 w-40 object-contain" /></div>
         <p className="mb-2 text-sm font-semibold text-keyar-700">NAMASTE SS INTERNATIONAL PVT. LTD.</p>
         <h1 className="text-3xl font-bold tracking-tight text-slate-900">Welcome back</h1>
         <p className="mt-2 text-sm leading-6 text-slate-500">Sign in to manage your invoices, customers, and product catalog.</p>
         {error && <div role="alert" className="mt-6 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{error}</div>}
         <form onSubmit={submit} className="mt-8 space-y-5">
           <Field label="Username" name="username" value={form.username} required autoComplete="username" onChange={(e) => setForm({ ...form, username: e.target.value })} />
-          <Field label="Password" name="password" type="password" value={form.password} required autoComplete="current-password" onChange={(e) => setForm({ ...form, password: e.target.value })} />
+          <label className="block">
+            <span className="form-label">Password<span className="text-rose-600"> *</span></span>
+            <span className="relative block">
+              <input id="password" name="password" type={showPassword ? "text" : "password"} value={form.password} required autoComplete="current-password" aria-label="Password" className="form-field pr-12" onChange={(e) => setForm({ ...form, password: e.target.value })} />
+              <button type="button" aria-label={showPassword ? "Hide password" : "Show password"} aria-pressed={showPassword} title={showPassword ? "Hide password" : "Show password"} className="absolute inset-y-0 right-0 flex items-center rounded-r-lg px-3 text-slate-500 hover:text-keyar-700" onClick={() => setShowPassword((visible) => !visible)}>
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </span>
+          </label>
           <Button type="submit" disabled={working} className="w-full">{working ? "Signing in…" : "Sign in securely"}</Button>
         </form>
         <p className="mt-6 text-xs text-slate-400">Access is managed by your Keyar administrator.</p>
@@ -92,7 +101,7 @@ function Sidebar({ page, setPage, user, logout, open, close }) {
     {open && <button aria-label="Close navigation" className="fixed inset-0 z-30 bg-slate-950/40 lg:hidden" onClick={close} />}
     <aside className={`fixed inset-y-0 left-0 z-40 flex w-[260px] flex-col border-r border-slate-200 bg-white transition-transform lg:translate-x-0 ${open ? "translate-x-0" : "-translate-x-full"}`}>
       <div className="flex h-[76px] items-center justify-between border-b border-slate-100 px-5">
-        <div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-keyar-900 text-lg font-black text-white">K</div><div><p className="font-extrabold tracking-tight text-keyar-900">KEYAR</p><p className="text-[10px] text-slate-500">NAMASTE SS INTERNATIONAL</p></div></div>
+        <div className="flex items-center gap-2"><img src="/keyar-logo.png" alt="Keyar" className="h-12 w-[92px] object-contain" /><p className="text-[9px] leading-tight text-slate-500">NAMASTE SS<br />INTERNATIONAL</p></div>
         <button aria-label="Close navigation" onClick={close} className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 lg:hidden"><X size={18} /></button>
       </div>
       <nav aria-label="Main navigation" className="flex-1 space-y-1 px-3 py-6">
@@ -526,7 +535,7 @@ function SettingsPage({ notify }) {
       <section className="card"><div className="mb-5 flex items-center gap-3"><div className="rounded-lg bg-keyar-50 p-2.5 text-keyar-700"><Building2 size={19} /></div><div><h2 className="font-bold">Business identity</h2><p className="text-xs text-slate-500">Used for tax calculation, invoice branding, and supplier details.</p></div></div>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{SETTING_FIELDS.slice(0, 9).map(([name, label, type, required]) => <div key={name} className={type === "textarea" ? "sm:col-span-2" : ""}><Field label={label} name={name} type={type === "textarea" ? "text" : type} rows={type === "textarea" ? 3 : undefined} value={form[name]} required={required} onChange={(event) => setForm({ ...form, [name]: event.target.value })} /></div>)}
           <div className="sm:col-span-2 lg:col-span-3"><span className="form-label">Company logo</span><div className="flex flex-wrap items-center gap-4 rounded-lg border border-dashed border-slate-300 p-4">
-            {form.logo_data ? <img src={form.logo_data} alt="Company logo preview" className="h-14 max-w-40 object-contain" /> : <div className="flex h-14 w-28 items-center justify-center rounded-lg bg-keyar-50 text-sm font-extrabold tracking-wide text-keyar-900">{form.brand_name}</div>}
+            {form.logo_data ? <img src={form.logo_data} alt="Company logo preview" className="h-14 max-w-40 object-contain" /> : <img src="/keyar-logo.png" alt="Keyar logo" className="h-14 w-28 object-contain" />}
             <div className="flex-1"><input aria-label="Upload company logo" type="file" accept="image/png,image/jpeg" className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-keyar-50 file:px-3 file:py-2 file:font-semibold file:text-keyar-800" onChange={(event) => {
               const file = event.target.files?.[0];
               if (!file) return;
@@ -597,7 +606,7 @@ export default function App() {
     <Sidebar page={page} setPage={changePage} user={user} logout={logout} open={mobileMenu} close={() => setMobileMenu(false)} />
     <div className="min-h-screen lg:pl-[260px]">
       <header className="no-print sticky top-0 z-20 flex h-[76px] items-center justify-between border-b border-slate-200 bg-white/95 px-4 backdrop-blur sm:px-7">
-        <div className="flex items-center gap-3"><button aria-label="Open navigation" className="rounded-lg p-2 text-slate-600 hover:bg-slate-100 lg:hidden" onClick={() => setMobileMenu(true)}><Menu size={20} /></button>
+        <div className="flex items-center gap-3"><button aria-label="Open navigation" className="rounded-lg p-2 text-slate-600 hover:bg-slate-100 lg:hidden" onClick={() => setMobileMenu(true)}><Menu size={20} /></button><img src="/keyar-logo.png" alt="Keyar" className="h-9 w-[70px] object-contain sm:hidden" />
           <div className="hidden sm:block"><p className="text-sm font-semibold text-slate-800">{navigation.find((item) => item.id === page)?.label || "Workspace"}</p><p className="text-xs text-slate-400">Namaste SS International Pvt. Ltd.</p></div></div>
         <div className="flex items-center gap-2"><span className="hidden items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1.5 text-[11px] font-semibold text-emerald-700 sm:inline-flex"><span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> All systems ready</span><button aria-label="Notifications" title="No new notifications" className="rounded-lg p-2 text-slate-400 hover:bg-slate-50"><Bell size={18} /></button><div className="ml-1 flex h-9 w-9 items-center justify-center rounded-full bg-keyar-100 text-sm font-bold text-keyar-900">{(user.first_name || user.username).slice(0, 1).toUpperCase()}</div></div>
       </header>

@@ -2,6 +2,7 @@ import { useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Image,
   Modal,
   Pressable,
   ScrollView,
@@ -30,6 +31,7 @@ export function Page({ children, scroll = true, style, refreshControl }) {
 export function Header({ title, subtitle, right }) {
   return (
     <View style={styles.header}>
+      <Image source={require("../../assets/keyar-logo.png")} style={styles.brandImage} resizeMode="contain" accessibilityLabel="Keyar logo" />
       <View style={{ flex: 1 }}>
         <Text style={styles.headerTitle}>{title}</Text>
         {!!subtitle && <Text style={styles.headerSubtitle}>{subtitle}</Text>}
@@ -122,7 +124,8 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.canvas },
   page: { flex: 1, paddingHorizontal: 18 },
   pageContent: { paddingTop: 14, paddingBottom: 36, gap: 16 },
-  header: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 2 },
+  header: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 2 },
+  brandImage: { width: 78, height: 42 },
   headerTitle: { color: colors.ink, fontWeight: "800", fontSize: 25, letterSpacing: -0.5 },
   headerSubtitle: { color: colors.muted, marginTop: 4, fontSize: 13, lineHeight: 18 },
   card: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, borderRadius: 17, padding: 16, gap: 9 },

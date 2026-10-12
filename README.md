@@ -21,7 +21,7 @@ npx expo start --android --port 8082` from `.env`.
 
 The backend waits for the MySQL health check, applies migrations, inserts the clearly identified sample catalog/profile, creates the first administrator from the environment, collects static files, and starts Gunicorn. The first boot needs internet access to pull base images and Python/Node packages. Do not expose the development HTTP ports directly to the public internet; terminate TLS at a reverse proxy/load balancer and restrict the database port (it is not published to the host).
 
-The initial company profile says **SAMPLE**/pending for information that has not been verified. Before issuing real invoices, an Admin must replace and verify the registered address, state/state code, GSTIN, phone/email, bank name/account/IFSC/branch, and invoice prefix under **Company settings**. An optional PNG/JPEG company logo (up to 1 MB) is embedded in newly created invoice snapshots and PDFs. Historical invoices retain their original supplier/customer details.
+The initial company profile says **SAMPLE**/pending for information that has not been verified. Before issuing real invoices, an Admin must replace and verify the registered address, state/state code, GSTIN, phone/email, bank name/account/IFSC/branch, and invoice prefix under **Company settings**. The supplied Keyar logo is used in the web and Android apps and as the default logo on invoice PDFs. An optional PNG/JPEG company logo (up to 1 MB) can replace it on newly created invoice snapshots and PDFs. Historical invoices retain their original supplier/customer details.
 
 ## Android mobile app
 
