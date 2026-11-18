@@ -6,7 +6,10 @@ from .models import CompanySettings, Customer, Invoice, InvoiceItem, Product
 class InvoiceItemInline(admin.TabularInline):
     model = InvoiceItem
     extra = 0
-    readonly_fields = ("description", "hsn_code", "quantity", "rate", "taxable_value", "cgst", "sgst", "igst", "total")
+    readonly_fields = (
+        "description", "hsn_code", "quantity", "rate", "cgst_rate", "sgst_rate",
+        "igst_rate", "taxable_value", "cgst", "sgst", "igst", "total",
+    )
 
 
 @admin.register(Invoice)

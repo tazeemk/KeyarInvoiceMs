@@ -221,6 +221,9 @@ export function InvoiceFormScreen({ navigation, route }) {
       quantity: String(line.quantity),
       rate: String(line.rate),
       gst_rate: String(line.gst_rate),
+      cgst_rate: line.cgst_rate != null ? String(line.cgst_rate) : "",
+      sgst_rate: line.sgst_rate != null ? String(line.sgst_rate) : "",
+      igst_rate: line.igst_rate != null ? String(line.igst_rate) : "",
     })),
   } : {
     customer: "",
@@ -229,7 +232,7 @@ export function InvoiceFormScreen({ navigation, route }) {
     vehicle_number: "",
     mobile_number: "",
     notes: "",
-    items: [{ product: "", quantity: "1", rate: "", gst_rate: "" }],
+    items: [{ product: "", quantity: "1", rate: "", gst_rate: "", cgst_rate: "", sgst_rate: "", igst_rate: "" }],
   });
   const [error, setError] = useState("");
 
@@ -305,6 +308,9 @@ export function InvoiceFormScreen({ navigation, route }) {
           quantity: Number(line.quantity),
           ...(line.rate !== "" ? { rate: Number(line.rate) } : {}),
           gst_rate: Number(line.gst_rate === "" ? product.gst_rate : line.gst_rate),
+          cgst_rate: line.cgst_rate === "" ? null : Number(line.cgst_rate),
+          sgst_rate: line.sgst_rate === "" ? null : Number(line.sgst_rate),
+          igst_rate: line.igst_rate === "" ? null : Number(line.igst_rate),
         };
       }),
     };
@@ -336,7 +342,7 @@ export function InvoiceFormScreen({ navigation, route }) {
         <Input label="Mobile number" value={form.mobile_number || customer?.mobile} onChangeText={(mobile_number) => setForm((current) => ({ ...current, mobile_number }))} keyboardType="phone-pad" />
         <Text style={styles.supply}>{customer ? `Place of supply: ${customer.state} · ${interstate ? "IGST" : "CGST + SGST"}` : "GST type follows supplier and customer state."}</Text>
       </Card>
-      <View style={styles.sectionHeader}><Text style={styles.section}>Invoice products</Text><Pressable onPress={() => setForm((current) => ({ ...current, items: [...current.items, { product: "", quantity: "1", rate: "", gst_rate: "" }] }))}><Text style={styles.addLine}>＋ Add line</Text></Pressable></View>
+      <View style={styles.sectionHeader}><Text style={styles.section}>Invoice products</Text><Pressable onPress={() => setForm((current) => ({ ...current, items: [...current.items, { product: "", quantity: "1", rate: "", gst_rate: "", cgst_rate: "", sgst_rate: "", igst_rate: "" }] }))}><Text style={styles.addLine}>＋ Add line</Text></Pressable></View>
       {form.items.map((line, index) => {
         const product = products.find((item) => String(item.id) === line.product);
         const gstRate = line.gst_rate === "" ? Number(product?.gst_rate || 0) : Number(line.gst_rate);
@@ -346,7 +352,9 @@ export function InvoiceFormScreen({ navigation, route }) {
           <View style={styles.inlineInputs}>
             <Input label="Quantity" keyboardType="decimal-pad" value={line.quantity} onChangeText={(value) => updateItem(index, "quantity", value)} style={styles.smallInput} />
             <Input label="Rate (INR)" keyboardType="decimal-pad" value={line.rate} onChangeText={(value) => updateItem(index, "rate", value)} style={styles.smallInput} />
-            <Input label="GST %" keyboardType="decimal-pad" value={line.gst_rate ?? product?.gst_rate} onChangeText={(value) => updateItem(index, "gst_rate", value)} style={styles.smallInput} />
+            <Input label="CGST %" keyboardType="decimal-pad" value={line.cgst_rate} onChangeText={(value) => updateItem(index, "cgst_rate", value)} style={styles.smallInput} />
+            <Input label="SGST %" keyboardType="decimal-pad" value={line.sgst_rate} onChangeText={(value) => updateItem(index, "sgst_rate", value)} style={styles.smallInput} />
+            <Input label="IGST %" keyboardType="decimal-pad" value={line.igst_rate} onChangeText={(value) => updateItem(index, "igst_rate", value)} style={styles.smallInput} />
           </View>
           <View style={styles.taxable}><Text style={styles.taxableLabel}>Taxable amount</Text><Text style={styles.taxableValue}>{money(Number(line.quantity || 0) * Number(line.rate || 0))}</Text><Text style={styles.taxableLabel}>GST at {gstRate}%</Text></View>
         </Card>;

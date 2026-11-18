@@ -276,8 +276,11 @@ function InvoiceEditor({ invoice, customers, products, company, onClose, onSaved
   const initial = invoice ? {
     customer: String(invoice.customer), invoice_date: invoice.invoice_date, due_date: invoice.due_date || "",
     vehicle_number: invoice.vehicle_number || "", mobile_number: invoice.mobile_number || "", notes: invoice.notes || "",
-    items: invoice.lines.map((line) => ({ product: String(line.product_id), quantity: line.quantity, rate: line.rate, gst_rate: line.gst_rate ?? "" })),
-  } : { customer: "", invoice_date: today(), due_date: "", vehicle_number: "", mobile_number: "", notes: "", items: [{ product: "", quantity: "1", rate: "", gst_rate: "" }] };
+    items: invoice.lines.map((line) => ({
+      product: String(line.product_id), quantity: line.quantity, rate: line.rate,
+      cgst_rate: line.cgst_rate ?? "", sgst_rate: line.sgst_rate ?? "", igst_rate: line.igst_rate ?? "",
+    })),
+  } : { customer: "", invoice_date: today(), due_date: "", vehicle_number: "", mobile_number: "", notes: "", items: [{ product: "", quantity: "1", rate: "", cgst_rate: "", sgst_rate: "", igst_rate: "" }] };
   const [form, setForm] = useState(initial);
   const [saving, setSaving] = useState(false);
   const customer = customers.find((item) => String(item.id) === form.customer);
@@ -307,7 +310,10 @@ function InvoiceEditor({ invoice, customers, products, company, onClose, onSaved
           product: Number(line.product),
           quantity: Number(line.quantity),
           rate: Number(line.rate),
-          gst_rate: Number(line.gst_rate ?? product?.gst_rate ?? 0),
+          gst_rate: Number(product?.gst_rate ?? 0),
+          cgst_rate: line.cgst_rate === "" ? null : Number(line.cgst_rate),
+          sgst_rate: line.sgst_rate === "" ? null : Number(line.sgst_rate),
+          igst_rate: line.igst_rate === "" ? null : Number(line.igst_rate),
         };
       }),
     };
@@ -331,8 +337,8 @@ function InvoiceEditor({ invoice, customers, products, company, onClose, onSaved
         <div className="flex items-end pb-2 text-xs text-slate-500">{customer ? <span className="rounded-md bg-keyar-50 px-2.5 py-2 text-keyar-800">Place of supply: {customer.state} · {interstate ? "IGST" : "CGST + SGST"}</span> : "Tax type follows the customer state."}</div>
       </div>
       <div className="mt-6 overflow-x-auto rounded-lg border border-slate-200">
-        <table className="w-full min-w-[660px] text-left text-xs">
-          <thead className="bg-slate-50 text-[10px] uppercase tracking-wide text-slate-500"><tr>{["Product", "Qty", "Rate (INR)", "GST", "Taxable"].map((name) => <th key={name} className="px-3 py-2.5">{name}</th>)}<th className="px-3 py-2.5"><span className="sr-only">Remove</span></th></tr></thead>
+        <table className="w-full min-w-[820px] text-left text-xs">
+          <thead className="bg-slate-50 text-[10px] uppercase tracking-wide text-slate-500"><tr>{["Product", "Qty", "Rate (INR)", "CGST %", "SGST %", "IGST %", "Taxable"].map((name) => <th key={name} className="px-3 py-2.5">{name}</th>)}<th className="px-3 py-2.5"><span className="sr-only">Remove</span></th></tr></thead>
           <tbody className="divide-y divide-slate-100">
             {form.items.map((line, index) => {
               const product = products.find((entry) => String(entry.id) === line.product);
@@ -343,12 +349,16 @@ function InvoiceEditor({ invoice, customers, products, company, onClose, onSaved
                     ...currentLine,
                     product: event.target.value,
                     rate: chosen ? String(chosen.default_price) : currentLine.rate,
-                    gst_rate: chosen ? String(chosen.gst_rate) : currentLine.gst_rate,
+                    cgst_rate: "",
+                    sgst_rate: "",
+                    igst_rate: "",
                   } : currentLine) }));
                 }}><option value="">Choose product</option>{products.filter((item) => item.active).map((item) => <option key={item.id} value={item.id}>{item.name} · {item.hsn_code}</option>)}</select></td>
                 <td className="px-2 py-2"><input aria-label={`Quantity ${index + 1}`} type="number" className="form-field w-24 py-2" value={line.quantity} onChange={(event) => setItem(index, "quantity", event.target.value)} /></td>
                 <td className="px-2 py-2"><input aria-label={`Rate ${index + 1}`} type="number" className="form-field w-28 py-2" value={line.rate} onChange={(event) => setItem(index, "rate", event.target.value)} /></td>
-                <td className="px-2 py-2"><input aria-label={`GST ${index + 1}`} type="number" className="form-field w-24 py-2" value={line.gst_rate ?? product?.gst_rate ?? 0} onChange={(event) => setItem(index, "gst_rate", event.target.value)} /></td>
+                <td className="px-2 py-2"><input aria-label={`CGST ${index + 1}`} type="number" min="0" max="100" className="form-field w-20 py-2" value={line.cgst_rate ?? ""} placeholder="0" onChange={(event) => setItem(index, "cgst_rate", event.target.value)} /></td>
+                <td className="px-2 py-2"><input aria-label={`SGST ${index + 1}`} type="number" min="0" max="100" className="form-field w-20 py-2" value={line.sgst_rate ?? ""} placeholder="0" onChange={(event) => setItem(index, "sgst_rate", event.target.value)} /></td>
+                <td className="px-2 py-2"><input aria-label={`IGST ${index + 1}`} type="number" min="0" max="100" className="form-field w-20 py-2" value={line.igst_rate ?? ""} placeholder="0" onChange={(event) => setItem(index, "igst_rate", event.target.value)} /></td>
                 <td className="px-3 py-2 whitespace-nowrap">{money(Number(line.quantity || 0) * Number(line.rate || 0))}</td>
                 <td className="px-2 py-2"><button type="button" aria-label={`Remove product ${index + 1}`} disabled={form.items.length === 1} onClick={() => setForm({ ...form, items: form.items.filter((_, i) => i !== index) })} className="rounded-md p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-30"><Trash2 size={15} /></button></td>
               </tr>;
@@ -356,7 +366,7 @@ function InvoiceEditor({ invoice, customers, products, company, onClose, onSaved
           </tbody>
         </table>
       </div>
-      <button type="button" onClick={() => setForm({ ...form, items: [...form.items, { product: "", quantity: "1", rate: "", gst_rate: "" }] })} className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-keyar-700 hover:text-keyar-900"><Plus size={15} /> Add another product</button>
+      <button type="button" onClick={() => setForm({ ...form, items: [...form.items, { product: "", quantity: "1", rate: "", cgst_rate: "", sgst_rate: "", igst_rate: "" }] })} className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-keyar-700 hover:text-keyar-900"><Plus size={15} /> Add another product</button>
       <div className="mt-5 grid gap-4 sm:grid-cols-2">
         <Field label="Invoice notes" name="notes" rows={2} value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} />
         <div className="rounded-lg bg-slate-50 p-4">

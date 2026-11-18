@@ -131,6 +131,9 @@ class InvoiceItemInputSerializer(serializers.Serializer):
     quantity = serializers.DecimalField(max_digits=12, decimal_places=3, min_value=Decimal("0.001"))
     rate = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=Decimal("0"), required=False)
     gst_rate = serializers.DecimalField(max_digits=5, decimal_places=2, min_value=Decimal("0"), max_value=Decimal("100"), required=False)
+    cgst_rate = serializers.DecimalField(max_digits=5, decimal_places=2, min_value=Decimal("0"), max_value=Decimal("100"), required=False, allow_null=True)
+    sgst_rate = serializers.DecimalField(max_digits=5, decimal_places=2, min_value=Decimal("0"), max_value=Decimal("100"), required=False, allow_null=True)
+    igst_rate = serializers.DecimalField(max_digits=5, decimal_places=2, min_value=Decimal("0"), max_value=Decimal("100"), required=False, allow_null=True)
 
 
 class InvoiceItemSerializer(serializers.ModelSerializer):
@@ -141,6 +144,7 @@ class InvoiceItemSerializer(serializers.ModelSerializer):
         fields = (
             "id", "product_id", "description", "hsn_code", "unit", "quantity",
             "rate", "gst_rate", "taxable_value", "cgst", "sgst", "igst", "total",
+            "cgst_rate", "sgst_rate", "igst_rate",
         )
 
 
@@ -232,7 +236,11 @@ class InvoiceSerializer(serializers.ModelSerializer):
         elif instance.customer_id != original_customer_id:
             settings = CompanySettings.objects.order_by("id").first()
             existing_items = [
-                {"product": item.product, "quantity": item.quantity, "rate": item.rate, "gst_rate": item.gst_rate}
+                {
+                    "product": item.product, "quantity": item.quantity, "rate": item.rate,
+                    "gst_rate": item.gst_rate, "cgst_rate": item.cgst_rate,
+                    "sgst_rate": item.sgst_rate, "igst_rate": item.igst_rate,
+                }
                 for item in instance.items.select_related("product")
             ]
             instance.items.all().delete()
@@ -257,16 +265,30 @@ class InvoiceSerializer(serializers.ModelSerializer):
             if gst_rate is None:
                 gst_rate = product.gst_rate
             gst_rate = Decimal(str(gst_rate))
+            cgst_rate = item.get("cgst_rate")
+            sgst_rate = item.get("sgst_rate")
+            igst_rate = item.get("igst_rate")
+            has_split_rates = any(value is not None for value in (cgst_rate, sgst_rate, igst_rate))
+            if not has_split_rates:
+                cgst_rate = Decimal("0") if interstate else gst_rate / Decimal("2")
+                sgst_rate = Decimal("0") if interstate else gst_rate - cgst_rate
+                igst_rate = gst_rate if interstate else Decimal("0")
+            else:
+                cgst_rate = Decimal(str(cgst_rate or 0))
+                sgst_rate = Decimal(str(sgst_rate or 0))
+                igst_rate = Decimal(str(igst_rate or 0))
+                gst_rate = cgst_rate + sgst_rate + igst_rate
             taxable_value = (quantity * rate).quantize(CENT, rounding=ROUND_HALF_UP)
-            tax = (taxable_value * gst_rate / Decimal("100")).quantize(CENT, rounding=ROUND_HALF_UP)
-            cgst = Decimal("0") if interstate else (tax / 2).quantize(CENT, rounding=ROUND_HALF_UP)
-            sgst = Decimal("0") if interstate else tax - cgst
-            igst = tax if interstate else Decimal("0")
+            cgst = (taxable_value * cgst_rate / Decimal("100")).quantize(CENT, rounding=ROUND_HALF_UP)
+            sgst = (taxable_value * sgst_rate / Decimal("100")).quantize(CENT, rounding=ROUND_HALF_UP)
+            igst = (taxable_value * igst_rate / Decimal("100")).quantize(CENT, rounding=ROUND_HALF_UP)
+            tax = cgst + sgst + igst
             InvoiceItem.objects.create(
                 invoice=invoice, product=product, description=product.name,
                 hsn_code=product.hsn_code, unit=product.unit, quantity=quantity, rate=rate,
                 gst_rate=gst_rate, taxable_value=taxable_value,
                 cgst=cgst, sgst=sgst, igst=igst, total=taxable_value + tax,
+                cgst_rate=cgst_rate, sgst_rate=sgst_rate, igst_rate=igst_rate,
             )
             taxable += taxable_value
             cgst_total += cgst

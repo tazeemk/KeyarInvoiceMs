@@ -70,6 +70,23 @@ class InvoiceApiTests(TestCase):
         self.assertEqual(invoice.sgst_total, Decimal("12.50"))
         self.assertEqual(invoice.grand_total, Decimal("225.00"))
 
+    def test_invoice_accepts_separate_cgst_sgst_and_igst_rates(self):
+        response = self.client.post("/api/invoices/", {
+            "customer": self.customer.id,
+            "invoice_date": "2026-06-29",
+            "items": [{
+                "product": self.product.id, "quantity": "5", "rate": "100",
+                "cgst_rate": "10", "sgst_rate": "5", "igst_rate": "0",
+            }],
+        }, format="json")
+        self.assertEqual(response.status_code, 201, response.data)
+        invoice = Invoice.objects.get(pk=response.data["id"])
+        self.assertEqual(invoice.taxable_total, Decimal("500.00"))
+        self.assertEqual(invoice.cgst_total, Decimal("50.00"))
+        self.assertEqual(invoice.sgst_total, Decimal("25.00"))
+        self.assertEqual(invoice.igst_total, Decimal("0.00"))
+        self.assertEqual(invoice.grand_total, Decimal("575.00"))
+
     def test_invoice_pdf_download(self):
         created = self.client.post("/api/invoices/", {
             "customer": self.customer.id,
