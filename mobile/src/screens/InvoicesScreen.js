@@ -146,8 +146,12 @@ export function InvoiceDetailsScreen({ navigation, route }) {
     </Page>
   );
   const interstate = Number(invoice.igst_total) > 0;
-  const gstRate = Number((invoice.lines || []).find((line) => Number(line.gst_rate) > 0)?.gst_rate || 18);
-  const splitGstRate = gstRate / 2;
+  const taxable = Number(invoice.taxable_total || 0);
+  const cgstRate = taxable ? Number(invoice.cgst_total || 0) * 100 / taxable : 0;
+  const sgstRate = taxable ? Number(invoice.sgst_total || 0) * 100 / taxable : 0;
+  const igstRate = taxable ? Number(invoice.igst_total || 0) * 100 / taxable : 0;
+  const gstRate = cgstRate + sgstRate + igstRate;
+  const formatRate = (value) => Number(value.toFixed(2)).toString();
 
   return (
     <Page>
@@ -173,13 +177,13 @@ export function InvoiceDetailsScreen({ navigation, route }) {
         {interstate ? <>
           <Total label="CGST (0%)" value={0} />
           <Total label="SGST (0%)" value={0} />
-          <Total label={`IGST (${gstRate}%)`} value={invoice.igst_total} />
+          <Total label={`IGST (${formatRate(igstRate)}%)`} value={invoice.igst_total} />
         </> : <>
-          <Total label={`CGST (${splitGstRate}%)`} value={invoice.cgst_total} />
-          <Total label={`SGST (${splitGstRate}%)`} value={invoice.sgst_total} />
+          <Total label={`CGST (${formatRate(cgstRate)}%)`} value={invoice.cgst_total} />
+          <Total label={`SGST (${formatRate(sgstRate)}%)`} value={invoice.sgst_total} />
           <Total label="IGST (0%)" value={0} />
         </>}
-        <Total label={`Total GST (${gstRate}%)`} value={Number(invoice.cgst_total) + Number(invoice.sgst_total) + Number(invoice.igst_total)} />
+        <Total label={`Total GST (${formatRate(gstRate)}%)`} value={Number(invoice.cgst_total) + Number(invoice.sgst_total) + Number(invoice.igst_total)} />
         <View style={styles.totalDivider} />
         <Total label="Grand total" value={invoice.grand_total} strong />
         {!!invoice.amount_in_words && <Text style={styles.words}>{invoice.amount_in_words}</Text>}
@@ -256,7 +260,11 @@ export function InvoiceFormScreen({ navigation, route }) {
     return { ...line, gst_rate: line.gst_rate === "" ? Number(product?.gst_rate || 0) : Number(line.gst_rate) };
   });
   const totals = calculateLines(lines, interstate);
-  const gstRate = Number(lines.find((line) => Number(line.gst_rate) > 0)?.gst_rate || 18);
+  const cgstRate = totals.taxable ? totals.cgst * 100 / totals.taxable : 0;
+  const sgstRate = totals.taxable ? totals.sgst * 100 / totals.taxable : 0;
+  const igstRate = totals.taxable ? totals.igst * 100 / totals.taxable : 0;
+  const gstRate = cgstRate + sgstRate + igstRate;
+  const formatRate = (value) => Number(value.toFixed(2)).toString();
 
   function updateItem(index, key, value) {
     setForm((current) => ({ ...current, items: current.items.map((line, i) => i === index ? { ...line, [key]: value } : line) }));
@@ -349,13 +357,13 @@ export function InvoiceFormScreen({ navigation, route }) {
         {interstate ? <>
           <Total label="CGST (0%)" value={0} />
           <Total label="SGST (0%)" value={0} />
-          <Total label={`IGST (${gstRate}%)`} value={totals.igst} />
+          <Total label={`IGST (${formatRate(igstRate)}%)`} value={totals.igst} />
         </> : <>
-          <Total label={`CGST (${gstRate / 2}%)`} value={totals.cgst} />
-          <Total label={`SGST (${gstRate / 2}%)`} value={totals.sgst} />
+          <Total label={`CGST (${formatRate(cgstRate)}%)`} value={totals.cgst} />
+          <Total label={`SGST (${formatRate(sgstRate)}%)`} value={totals.sgst} />
           <Total label="IGST (0%)" value={0} />
         </>}
-        <Total label={`Total GST (${gstRate}%)`} value={totals.cgst + totals.sgst + totals.igst} />
+        <Total label={`Total GST (${formatRate(gstRate)}%)`} value={totals.cgst + totals.sgst + totals.igst} />
         <View style={styles.totalDivider} />
         <Total label="Grand total" value={totals.grand} strong />
       </Card>

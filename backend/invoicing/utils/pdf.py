@@ -201,12 +201,14 @@ def render_invoice_pdf(invoice):
     ]))
     story.extend([item_table, Spacer(1, 5)])
 
-    gst_rate = max((item.gst_rate for item in invoice_items), default=Decimal("18"))
-    split_gst_rate = gst_rate / 2
-    igst_rate = gst_rate if invoice.igst_total > 0 else Decimal("0")
-    cgst_rate = Decimal("0") if invoice.igst_total > 0 else split_gst_rate
-    sgst_rate = Decimal("0") if invoice.igst_total > 0 else split_gst_rate
     total_gst = invoice.cgst_total + invoice.sgst_total + invoice.igst_total
+    if invoice.taxable_total:
+        cgst_rate = (invoice.cgst_total * Decimal("100") / invoice.taxable_total).quantize(Decimal("0.01"))
+        sgst_rate = (invoice.sgst_total * Decimal("100") / invoice.taxable_total).quantize(Decimal("0.01"))
+        igst_rate = (invoice.igst_total * Decimal("100") / invoice.taxable_total).quantize(Decimal("0.01"))
+        gst_rate = cgst_rate + sgst_rate + igst_rate
+    else:
+        cgst_rate = sgst_rate = igst_rate = gst_rate = Decimal("0")
     tax_rows = [
         [Paragraph("<b>Taxable Value</b>", body), Paragraph(f"<b>CGST ({cgst_rate:g}%)</b>", body),
          Paragraph(f"<b>SGST ({sgst_rate:g}%)</b>", body), Paragraph(f"<b>IGST ({igst_rate:g}%)</b>", body),
