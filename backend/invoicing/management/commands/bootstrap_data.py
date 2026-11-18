@@ -12,7 +12,10 @@ class Command(BaseCommand):
     help = "Create the clearly marked sample company, catalog, and first administrator."
 
     def handle(self, *args, **options):
-        CompanySettings.objects.get_or_create(pk=1)
+        settings, _ = CompanySettings.objects.get_or_create(pk=1)
+        if settings.invoice_prefix == "KEYAR/":
+            settings.invoice_prefix = "KE10/"
+            settings.save(update_fields=["invoice_prefix"])
         samples = [
             ("INDOC OA 2", "20 kg", "White", "34024200", "KGS", "285.00"),
             ("Slurry", "50 kg", "White", "340290", "KGS", "50.00"),

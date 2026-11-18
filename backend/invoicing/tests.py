@@ -31,7 +31,7 @@ class InvoiceApiTests(TestCase):
         }, format="json")
         self.assertEqual(response.status_code, 201, response.data)
         invoice = Invoice.objects.get(pk=response.data["id"])
-        self.assertEqual(invoice.invoice_number, "KEYAR/2026-27/0001")
+        self.assertEqual(invoice.invoice_number, "KE10/2026-27/0001")
         self.assertEqual(invoice.taxable_total, Decimal("200.00"))
         self.assertEqual(invoice.cgst_total, Decimal("18.00"))
         self.assertEqual(invoice.sgst_total, Decimal("18.00"))

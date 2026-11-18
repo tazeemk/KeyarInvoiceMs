@@ -1,5 +1,6 @@
 from io import BytesIO
 import base64
+from decimal import Decimal
 from pathlib import Path
 
 import qrcode
@@ -200,13 +201,21 @@ def render_invoice_pdf(invoice):
     ]))
     story.extend([item_table, Spacer(1, 5)])
 
+    gst_rate = max((item.gst_rate for item in invoice_items), default=Decimal("18"))
+    split_gst_rate = gst_rate / 2
+    igst_rate = gst_rate if invoice.igst_total > 0 else Decimal("0")
+    cgst_rate = Decimal("0") if invoice.igst_total > 0 else split_gst_rate
+    sgst_rate = Decimal("0") if invoice.igst_total > 0 else split_gst_rate
+    total_gst = invoice.cgst_total + invoice.sgst_total + invoice.igst_total
     tax_rows = [
-        [Paragraph("<b>Taxable Value</b>", body), Paragraph("<b>CGST</b>", body), Paragraph("<b>SGST</b>", body),
-         Paragraph("<b>IGST</b>", body), Paragraph("<b>Grand Total</b>", body)],
+        [Paragraph("<b>Taxable Value</b>", body), Paragraph(f"<b>CGST ({cgst_rate:g}%)</b>", body),
+         Paragraph(f"<b>SGST ({sgst_rate:g}%)</b>", body), Paragraph(f"<b>IGST ({igst_rate:g}%)</b>", body),
+         Paragraph(f"<b>Total GST ({gst_rate:g}%)</b>", body), Paragraph("<b>Grand Total</b>", body)],
         [_money(invoice.taxable_total), _money(invoice.cgst_total), _money(invoice.sgst_total),
-         _money(invoice.igst_total), Paragraph(f"<b>INR {_money(invoice.grand_total)}</b>", right)],
+         _money(invoice.igst_total), _money(total_gst),
+         Paragraph(f"<b>INR {_money(invoice.grand_total)}</b>", right)],
     ]
-    tax_table = Table(tax_rows, colWidths=[104.6] * 5)
+    tax_table = Table(tax_rows, colWidths=[87.2] * 6)
     tax_table.setStyle(TableStyle([
         ("BOX", (0, 0), (-1, -1), 0.55, RULE), ("INNERGRID", (0, 0), (-1, -1), 0.45, RULE),
         ("BACKGROUND", (0, 0), (-1, 0), PALE), ("ALIGN", (0, 0), (-1, -1), "RIGHT"),

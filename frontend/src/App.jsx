@@ -286,6 +286,8 @@ function InvoiceEditor({ invoice, customers, products, company, onClose, onSaved
     const product = products.find((entry) => String(entry.id) === line.product);
     return { ...line, gst_rate: Number(line.gst_rate ?? product?.gst_rate ?? 0) };
   });
+  const gstRate = Number(enriched.find((line) => line.gst_rate > 0)?.gst_rate || 18);
+  const splitGstRate = gstRate / 2;
   const totals = useMemo(() => calculateInvoice(enriched, interstate), [form.items, products, interstate]);
   function setItem(index, key, value) {
     setForm((current) => ({ ...current, items: current.items.map((line, i) => i === index ? { ...line, [key]: value } : line) }));
@@ -356,10 +358,16 @@ function InvoiceEditor({ invoice, customers, products, company, onClose, onSaved
         <Field label="Invoice notes" name="notes" rows={2} value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} />
         <div className="rounded-lg bg-slate-50 p-4">
           <div className="flex justify-between py-1.5 text-sm"><span className="text-slate-500">Taxable value</span><b>{money(totals.taxable)}</b></div>
-          {interstate ? <div className="flex justify-between py-1.5 text-sm"><span className="text-slate-500">IGST</span><b>{money(totals.igst)}</b></div> : <>
-            <div className="flex justify-between py-1.5 text-sm"><span className="text-slate-500">CGST</span><b>{money(totals.cgst)}</b></div>
-            <div className="flex justify-between py-1.5 text-sm"><span className="text-slate-500">SGST</span><b>{money(totals.sgst)}</b></div>
+          {interstate ? <>
+            <div className="flex justify-between py-1.5 text-sm"><span className="text-slate-500">CGST (0%)</span><b>{money(0)}</b></div>
+            <div className="flex justify-between py-1.5 text-sm"><span className="text-slate-500">SGST (0%)</span><b>{money(0)}</b></div>
+            <div className="flex justify-between py-1.5 text-sm"><span className="text-slate-500">IGST ({gstRate}%)</span><b>{money(totals.igst)}</b></div>
+          </> : <>
+            <div className="flex justify-between py-1.5 text-sm"><span className="text-slate-500">CGST ({splitGstRate}%)</span><b>{money(totals.cgst)}</b></div>
+            <div className="flex justify-between py-1.5 text-sm"><span className="text-slate-500">SGST ({splitGstRate}%)</span><b>{money(totals.sgst)}</b></div>
+            <div className="flex justify-between py-1.5 text-sm"><span className="text-slate-500">IGST (0%)</span><b>{money(0)}</b></div>
           </>}
+          <div className="flex justify-between py-1.5 text-sm"><span className="text-slate-500">Total GST ({gstRate}%)</span><b>{money(totals.cgst + totals.sgst + totals.igst)}</b></div>
           <div className="mt-2 flex justify-between border-t border-slate-200 pt-3 text-base font-bold"><span>Grand total</span><span className="text-keyar-900">{money(totals.total)}</span></div>
         </div>
       </div>
@@ -440,7 +448,7 @@ function InvoicesPage({ notify, onCreate, refreshSignal }) {
     {selected && <Modal title={selected.invoice_number} onClose={() => setSelected(null)}>
       <div className="mb-5 flex flex-wrap items-start justify-between gap-4 border-b border-slate-100 pb-5"><div><p className="text-sm text-slate-500">Tax invoice for</p><h3 className="mt-1 text-lg font-bold text-slate-900">{selected.customer_name}</h3><p className="mt-1 text-xs text-slate-500">{selected.place_of_supply} · {selected.invoice_date}</p></div><p className="text-right text-2xl font-bold text-keyar-900">{money(selected.grand_total)}</p></div>
       <div className="overflow-x-auto rounded-lg border border-slate-100"><table className="w-full min-w-[520px] text-left text-sm"><thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-3 py-3">Description</th><th className="px-3 py-3">Qty</th><th className="px-3 py-3">Rate</th><th className="px-3 py-3">GST</th><th className="px-3 py-3 text-right">Taxable</th></tr></thead><tbody className="divide-y divide-slate-100">{selected.lines.map((line) => <tr key={line.id}><td className="px-3 py-3"><p className="font-medium">{line.description}</p><p className="text-xs text-slate-400">HSN {line.hsn_code}</p></td><td className="px-3 py-3">{line.quantity} {line.unit}</td><td className="px-3 py-3">{money(line.rate)}</td><td className="px-3 py-3">{line.gst_rate}%</td><td className="px-3 py-3 text-right">{money(line.taxable_value)}</td></tr>)}</tbody></table></div>
-      <div className="ml-auto mt-4 max-w-xs space-y-2 text-sm"><div className="flex justify-between"><span className="text-slate-500">Taxable amount</span><b>{money(selected.taxable_total)}</b></div>{selected.igst_total > 0 ? <div className="flex justify-between"><span className="text-slate-500">IGST</span><b>{money(selected.igst_total)}</b></div> : <><div className="flex justify-between"><span className="text-slate-500">CGST</span><b>{money(selected.cgst_total)}</b></div><div className="flex justify-between"><span className="text-slate-500">SGST</span><b>{money(selected.sgst_total)}</b></div></>}<div className="flex justify-between border-t border-slate-200 pt-2 text-base font-bold"><span>Total</span><span>{money(selected.grand_total)}</span></div></div>
+      <div className="ml-auto mt-4 max-w-xs space-y-2 text-sm"><div className="flex justify-between"><span className="text-slate-500">Taxable amount</span><b>{money(selected.taxable_total)}</b></div>{selected.igst_total > 0 ? <><div className="flex justify-between"><span className="text-slate-500">CGST (0%)</span><b>{money(0)}</b></div><div className="flex justify-between"><span className="text-slate-500">SGST (0%)</span><b>{money(0)}</b></div><div className="flex justify-between"><span className="text-slate-500">IGST ({Number(selected.lines?.[0]?.gst_rate || 18)}%)</span><b>{money(selected.igst_total)}</b></div></> : <><div className="flex justify-between"><span className="text-slate-500">CGST ({Number(selected.lines?.[0]?.gst_rate || 18) / 2}%)</span><b>{money(selected.cgst_total)}</b></div><div className="flex justify-between"><span className="text-slate-500">SGST ({Number(selected.lines?.[0]?.gst_rate || 18) / 2}%)</span><b>{money(selected.sgst_total)}</b></div><div className="flex justify-between"><span className="text-slate-500">IGST (0%)</span><b>{money(0)}</b></div></>}<div className="flex justify-between"><span className="text-slate-500">Total GST ({Number(selected.lines?.[0]?.gst_rate || 18)}%)</span><b>{money(selected.cgst_total + selected.sgst_total + selected.igst_total)}</b></div><div className="flex justify-between border-t border-slate-200 pt-2 text-base font-bold"><span>Total</span><span>{money(selected.grand_total)}</span></div></div>
       <p className="mt-4 rounded-lg bg-slate-50 p-3 text-xs text-slate-600"><b>Amount in words:</b> {selected.amount_in_words}</p>
       <div className="mt-6 flex flex-wrap justify-end gap-2"><Button variant="secondary" onClick={() => printPdf(selected)}>Print</Button><Button variant="secondary" onClick={() => downloadInvoicePdf(selected.id, selected.invoice_number).catch((error) => notify("error", errorMessage(error)))}><ArrowDownToLine size={16} /> Download PDF</Button><Button variant="secondary" onClick={async () => { setSelected(null); await openEditor(selected); }}><Pencil size={16} /> Edit</Button><Button variant="secondary" className="text-rose-700 hover:bg-rose-50" onClick={() => remove(selected)}><Trash2 size={16} /> Delete</Button></div>
     </Modal>}

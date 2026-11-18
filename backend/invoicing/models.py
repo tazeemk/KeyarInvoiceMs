@@ -54,7 +54,7 @@ class CompanySettings(models.Model):
     bank_account = models.CharField(max_length=80, blank=True, default="Account number to be verified")
     bank_ifsc = models.CharField(max_length=20, blank=True, default="IFSC to be verified")
     bank_branch = models.CharField(max_length=120, blank=True, default="Branch to be verified")
-    invoice_prefix = models.CharField(max_length=20, default="KEYAR/")
+    invoice_prefix = models.CharField(max_length=20, default="KE10/")
     footer_text = models.CharField(max_length=240, default="This is a computer generated document.")
     is_sample = models.BooleanField(default=True)
 

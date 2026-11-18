@@ -146,6 +146,8 @@ export function InvoiceDetailsScreen({ navigation, route }) {
     </Page>
   );
   const interstate = Number(invoice.igst_total) > 0;
+  const gstRate = Number((invoice.lines || []).find((line) => Number(line.gst_rate) > 0)?.gst_rate || 18);
+  const splitGstRate = gstRate / 2;
 
   return (
     <Page>
@@ -168,10 +170,16 @@ export function InvoiceDetailsScreen({ navigation, route }) {
       ))}
       <Card style={styles.totals}>
         <Total label="Taxable amount" value={invoice.taxable_total} />
-        {interstate ? <Total label="IGST" value={invoice.igst_total} /> : <>
-          <Total label="CGST" value={invoice.cgst_total} />
-          <Total label="SGST" value={invoice.sgst_total} />
+        {interstate ? <>
+          <Total label="CGST (0%)" value={0} />
+          <Total label="SGST (0%)" value={0} />
+          <Total label={`IGST (${gstRate}%)`} value={invoice.igst_total} />
+        </> : <>
+          <Total label={`CGST (${splitGstRate}%)`} value={invoice.cgst_total} />
+          <Total label={`SGST (${splitGstRate}%)`} value={invoice.sgst_total} />
+          <Total label="IGST (0%)" value={0} />
         </>}
+        <Total label={`Total GST (${gstRate}%)`} value={Number(invoice.cgst_total) + Number(invoice.sgst_total) + Number(invoice.igst_total)} />
         <View style={styles.totalDivider} />
         <Total label="Grand total" value={invoice.grand_total} strong />
         {!!invoice.amount_in_words && <Text style={styles.words}>{invoice.amount_in_words}</Text>}
@@ -248,6 +256,7 @@ export function InvoiceFormScreen({ navigation, route }) {
     return { ...line, gst_rate: line.gst_rate === "" ? Number(product?.gst_rate || 0) : Number(line.gst_rate) };
   });
   const totals = calculateLines(lines, interstate);
+  const gstRate = Number(lines.find((line) => Number(line.gst_rate) > 0)?.gst_rate || 18);
 
   function updateItem(index, key, value) {
     setForm((current) => ({ ...current, items: current.items.map((line, i) => i === index ? { ...line, [key]: value } : line) }));
@@ -337,7 +346,16 @@ export function InvoiceFormScreen({ navigation, route }) {
       <Input label="Invoice notes" value={form.notes} onChangeText={(notes) => setForm((current) => ({ ...current, notes }))} multiline />
       <Card style={styles.totals}>
         <Total label="Taxable value" value={totals.taxable} />
-        {interstate ? <Total label="IGST" value={totals.igst} /> : <><Total label="CGST" value={totals.cgst} /><Total label="SGST" value={totals.sgst} /></>}
+        {interstate ? <>
+          <Total label="CGST (0%)" value={0} />
+          <Total label="SGST (0%)" value={0} />
+          <Total label={`IGST (${gstRate}%)`} value={totals.igst} />
+        </> : <>
+          <Total label={`CGST (${gstRate / 2}%)`} value={totals.cgst} />
+          <Total label={`SGST (${gstRate / 2}%)`} value={totals.sgst} />
+          <Total label="IGST (0%)" value={0} />
+        </>}
+        <Total label={`Total GST (${gstRate}%)`} value={totals.cgst + totals.sgst + totals.igst} />
         <View style={styles.totalDivider} />
         <Total label="Grand total" value={totals.grand} strong />
       </Card>
