@@ -7,7 +7,7 @@ import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 import { AuthProvider, useAuth } from "./src/auth/AuthContext";
 import DashboardScreen from "./src/screens/DashboardScreen";
-import InvoiceDetailsScreen, { InvoiceFormScreen, InvoiceListScreen } from "./src/screens/InvoicesScreen";
+import { InvoiceDetailsScreen, InvoiceFormScreen, InvoiceListScreen } from "./src/screens/InvoicesScreen";
 import LoginScreen from "./src/screens/LoginScreen";
 import MoreScreen from "./src/screens/MoreScreen";
 import RecordsScreen from "./src/screens/RecordsScreen";
