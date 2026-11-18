@@ -1,5 +1,6 @@
 from io import BytesIO
 import base64
+import binascii
 from decimal import Decimal
 from pathlib import Path
 
@@ -9,7 +10,7 @@ from reportlab.lib.enums import TA_CENTER, TA_RIGHT
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.utils import ImageReader
-from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import Image, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 
 INK = colors.HexColor("#1d2939")
@@ -38,6 +39,8 @@ def render_invoice_pdf(invoice):
     bank_ifsc = invoice.supplier_bank_ifsc or settings.bank_ifsc
     bank_branch = invoice.supplier_bank_branch or settings.bank_branch
     footer_text = invoice.supplier_footer or settings.footer_text
+    authorised_signatory_name = invoice.authorised_signatory_name or settings.authorised_signatory_name
+    authorised_signature_data = invoice.authorised_signature_data or settings.authorised_signature_data
     customer_name = invoice.customer_name or invoice.customer.name
     customer_address = invoice.customer_address or invoice.customer.address
     customer_gstin = invoice.customer_gstin or invoice.customer.gstin
@@ -111,6 +114,16 @@ def render_invoice_pdf(invoice):
         canvas.drawRightString(width - 42, footer_y + 66, f"For {company_name}")
         canvas.setStrokeColor(RULE)
         canvas.rect(width - 168, footer_y + 15, 126, 38, stroke=1, fill=0)
+        if authorised_signature_data:
+            try:
+                signature_payload = authorised_signature_data.split(",", 1)[1]
+                canvas.drawImage(
+                    ImageReader(BytesIO(base64.b64decode(signature_payload))),
+                    width - 158, footer_y + 18, width=106, height=32,
+                    preserveAspectRatio=True, anchor="c", mask="auto",
+                )
+            except (IndexError, binascii.Error, ValueError):
+                pass
         canvas.setFont("Helvetica", 7)
         canvas.drawRightString(width - 47, footer_y + 7, "Authorised Signatory")
         canvas.setFont("Helvetica", 6.5)
@@ -230,12 +243,25 @@ def render_invoice_pdf(invoice):
     ])
     if invoice.notes:
         story.extend([Spacer(1, 3), Paragraph(f"<b>Notes:</b> {safe(invoice.notes)}", body)])
+    right_signature = [Paragraph("<b>Authorised Signatory</b>", centered)]
+    if authorised_signatory_name:
+        right_signature.append(Paragraph(safe(authorised_signatory_name), centered))
+    if authorised_signature_data:
+        try:
+            signature_payload = authorised_signature_data.split(",", 1)[1]
+            right_signature.insert(0, Image(
+                BytesIO(base64.b64decode(signature_payload)),
+                width=90, height=28,
+                kind="proportional",
+            ))
+        except (IndexError, binascii.Error, ValueError):
+            pass
     story.extend([
         Spacer(1, 8),
         Table(
             [["", ""], [
                 Paragraph("Customer's Seal &amp; Signature", centered),
-                Paragraph("Authorised Signatory", centered),
+                right_signature,
             ]],
             colWidths=[261.5, 261.5],
             rowHeights=[36, 18],

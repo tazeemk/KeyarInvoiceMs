@@ -125,6 +125,24 @@ class CompanySettingsSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("The selected file is not a valid image.")
         return value
 
+    def validate_authorised_signature_data(self, value):
+        if not value:
+            return value
+        match = re.fullmatch(r"data:image/(png|jpeg);base64,([A-Za-z0-9+/=]+)", value)
+        if not match:
+            raise serializers.ValidationError("Upload a PNG or JPEG signature.")
+        try:
+            image_bytes = base64.b64decode(match.group(2), validate=True)
+            with Image.open(BytesIO(image_bytes)) as image:
+                if image.width > 4000 or image.height > 4000:
+                    raise serializers.ValidationError("Signature dimensions must not exceed 4000 × 4000 pixels.")
+                if len(image_bytes) > 1_000_000:
+                    raise serializers.ValidationError("Signature images must be smaller than 1 MB.")
+                image.verify()
+        except (binascii.Error, ValueError, UnidentifiedImageError, OSError):
+            raise serializers.ValidationError("The selected signature is invalid.")
+        return value
+
 
 class InvoiceItemInputSerializer(serializers.Serializer):
     product = serializers.PrimaryKeyRelatedField(queryset=Product.objects.filter(active=True))
@@ -161,6 +179,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
             "supplier_address", "supplier_gstin", "supplier_state", "supplier_state_code", "supplier_pincode",
             "supplier_phone", "supplier_email", "supplier_bank_name", "supplier_bank_account",
             "supplier_bank_ifsc", "supplier_bank_branch", "supplier_logo_data", "supplier_footer",
+            "authorised_signatory_name", "authorised_signature_data",
             "place_of_supply", "vehicle_number", "mobile_number", "notes", "taxable_total",
             "cgst_total", "sgst_total", "igst_total", "grand_total", "amount_in_words",
             "lines", "items", "created_by", "created_at",
@@ -181,6 +200,22 @@ class InvoiceSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"items": "Add at least one product to the invoice."})
         return attrs
 
+    def validate_authorised_signature_data(self, value):
+        if not value:
+            return value
+        match = re.fullmatch(r"data:image/(png|jpeg);base64,([A-Za-z0-9+/=]+)", value)
+        if not match:
+            raise serializers.ValidationError("Upload a PNG or JPEG signature.")
+        try:
+            image_bytes = base64.b64decode(match.group(2), validate=True)
+            with Image.open(BytesIO(image_bytes)) as image:
+                if len(image_bytes) > 1_000_000 or image.width > 4000 or image.height > 4000:
+                    raise serializers.ValidationError("Use a valid PNG or JPEG signature smaller than 1 MB.")
+                image.verify()
+        except (binascii.Error, ValueError, UnidentifiedImageError, OSError):
+            raise serializers.ValidationError("The selected signature is invalid.")
+        return value
+
     @transaction.atomic
     def create(self, validated_data):
         item_data = validated_data.pop("items")
@@ -188,6 +223,10 @@ class InvoiceSerializer(serializers.ModelSerializer):
         if not settings:
             raise serializers.ValidationError({"detail": "Company settings are missing."})
         customer = validated_data["customer"]
+        if not validated_data.get("authorised_signatory_name"):
+            validated_data["authorised_signatory_name"] = settings.authorised_signatory_name
+        if not validated_data.get("authorised_signature_data"):
+            validated_data["authorised_signature_data"] = settings.authorised_signature_data
         invoice_date = validated_data.get("invoice_date", timezone.localdate())
         fiscal_year = f"{invoice_date.year}-{str(invoice_date.year + 1)[-2:]}" if invoice_date.month >= 4 else f"{invoice_date.year - 1}-{str(invoice_date.year)[-2:]}"
         counter, _ = InvoiceCounter.objects.select_for_update().get_or_create(fiscal_year=fiscal_year)

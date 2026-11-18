@@ -276,11 +276,13 @@ function InvoiceEditor({ invoice, customers, products, company, onClose, onSaved
   const initial = invoice ? {
     customer: String(invoice.customer), invoice_date: invoice.invoice_date, due_date: invoice.due_date || "",
     vehicle_number: invoice.vehicle_number || "", mobile_number: invoice.mobile_number || "", notes: invoice.notes || "",
+    authorised_signatory_name: invoice.authorised_signatory_name || "", authorised_signature_data: invoice.authorised_signature_data || "",
     items: invoice.lines.map((line) => ({
       product: String(line.product_id), quantity: line.quantity, rate: line.rate,
       cgst_rate: line.cgst_rate ?? "", sgst_rate: line.sgst_rate ?? "", igst_rate: line.igst_rate ?? "",
     })),
-  } : { customer: "", invoice_date: today(), due_date: "", vehicle_number: "", mobile_number: "", notes: "", items: [{ product: "", quantity: "1", rate: "", cgst_rate: "", sgst_rate: "", igst_rate: "" }] };
+  } : { customer: "", invoice_date: today(), due_date: "", vehicle_number: "", mobile_number: "", notes: "",
+    authorised_signatory_name: "", authorised_signature_data: "", items: [{ product: "", quantity: "1", rate: "", cgst_rate: "", sgst_rate: "", igst_rate: "" }] };
   const [form, setForm] = useState(initial);
   const [saving, setSaving] = useState(false);
   const customer = customers.find((item) => String(item.id) === form.customer);
@@ -304,6 +306,8 @@ function InvoiceEditor({ invoice, customers, products, company, onClose, onSaved
     const payload = {
       customer: Number(form.customer), invoice_date: form.invoice_date, due_date: form.due_date || null,
       vehicle_number: form.vehicle_number, mobile_number: form.mobile_number, notes: form.notes,
+      authorised_signatory_name: form.authorised_signatory_name,
+      authorised_signature_data: form.authorised_signature_data,
       items: form.items.map((line) => {
         const product = products.find((entry) => String(entry.id) === line.product);
         return {
@@ -382,6 +386,26 @@ function InvoiceEditor({ invoice, customers, products, company, onClose, onSaved
           </>}
           <div className="flex justify-between py-1.5 text-sm"><span className="text-slate-500">Total GST ({formatRate(gstRate)}%)</span><b>{money(totals.cgst + totals.sgst + totals.igst)}</b></div>
           <div className="mt-2 flex justify-between border-t border-slate-200 pt-3 text-base font-bold"><span>Grand total</span><span className="text-keyar-900">{money(totals.total)}</span></div>
+        </div>
+      </div>
+      <div className="mt-5 rounded-lg border border-slate-200 p-4">
+        <p className="mb-3 font-semibold text-slate-800">Authorised Signatory</p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Signatory name" name="authorised_signatory_name" value={form.authorised_signatory_name} onChange={(event) => setForm({ ...form, authorised_signatory_name: event.target.value })} />
+          <div>
+            <span className="form-label">Digital signature</span>
+            {form.authorised_signature_data && <img src={form.authorised_signature_data} alt="Authorised signature preview" className="mb-2 h-16 max-w-48 object-contain" />}
+            <input aria-label="Upload authorised signature" type="file" accept="image/png,image/jpeg" className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-keyar-50 file:px-3 file:py-2 file:font-semibold file:text-keyar-800" onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (!file) return;
+              if (file.size > 1_000_000) { notify("error", "Signature images must be smaller than 1 MB."); event.target.value = ""; return; }
+              const reader = new FileReader();
+              reader.onload = () => setForm((current) => ({ ...current, authorised_signature_data: reader.result }));
+              reader.onerror = () => notify("error", "Unable to read the selected signature.");
+              reader.readAsDataURL(file);
+            }} />
+            {form.authorised_signature_data && <button type="button" className="mt-2 text-xs font-semibold text-rose-700" onClick={() => setForm({ ...form, authorised_signature_data: "" })}>Remove signature</button>}
+          </div>
         </div>
       </div>
       <div className="mt-6 flex justify-end gap-2"><Button type="button" variant="secondary" onClick={onClose}>Cancel</Button><Button type="submit" disabled={saving || !customers.length || !products.length}>{saving ? "Saving…" : invoice ? "Save changes" : "Create invoice"}</Button></div>
@@ -579,6 +603,22 @@ function SettingsPage({ notify }) {
             }} /><p className="mt-1.5 text-xs text-slate-400">PNG or JPEG, up to 1 MB. Printed in the invoice header.</p></div>
             {form.logo_data && <Button type="button" variant="secondary" onClick={() => setForm({ ...form, logo_data: "" })}>Remove logo</Button>}
           </div></div>
+          <div className="sm:col-span-2 lg:col-span-3">
+            <Field label="Authorised signatory name" name="authorised_signatory_name" value={form.authorised_signatory_name || ""} onChange={(event) => setForm({ ...form, authorised_signatory_name: event.target.value })} />
+            <div className="mt-3"><span className="form-label">Authorised signature image</span><div className="flex flex-wrap items-center gap-4 rounded-lg border border-dashed border-slate-300 p-4">
+              {form.authorised_signature_data && <img src={form.authorised_signature_data} alt="Authorised signature preview" className="h-16 max-w-48 object-contain" />}
+              <div className="flex-1"><input aria-label="Upload authorised signature" type="file" accept="image/png,image/jpeg" className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-keyar-50 file:px-3 file:py-2 file:font-semibold file:text-keyar-800" onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (!file) return;
+                if (file.size > 1_000_000) { notify("error", "Signature images must be smaller than 1 MB."); event.target.value = ""; return; }
+                const reader = new FileReader();
+                reader.onload = () => setForm((current) => ({ ...current, authorised_signature_data: reader.result }));
+                reader.onerror = () => notify("error", "Unable to read the selected signature.");
+                reader.readAsDataURL(file);
+              }} /><p className="mt-1.5 text-xs text-slate-400">PNG or JPEG, up to 1 MB. Printed only in Authorised Signatory.</p></div>
+              {form.authorised_signature_data && <Button type="button" variant="secondary" onClick={() => setForm({ ...form, authorised_signature_data: "" })}>Remove signature</Button>}
+            </div></div>
+          </div>
         </div>
       </section>
       <section className="card"><div className="mb-5 flex items-center gap-3"><div className="rounded-lg bg-emerald-50 p-2.5 text-emerald-700"><BadgeIndianRupee size={19} /></div><div><h2 className="font-bold">Bank details & invoice footer</h2><p className="text-xs text-slate-500">Printed in the payment and signature section of the invoice PDF.</p></div></div>

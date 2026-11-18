@@ -216,6 +216,8 @@ export function InvoiceFormScreen({ navigation, route }) {
     vehicle_number: invoice.vehicle_number || "",
     mobile_number: invoice.mobile_number || "",
     notes: invoice.notes || "",
+    authorised_signatory_name: invoice.authorised_signatory_name || "",
+    authorised_signature_data: invoice.authorised_signature_data || "",
     items: (invoice.lines || []).map((line) => ({
       product: String(line.product_id),
       quantity: String(line.quantity),
@@ -232,6 +234,8 @@ export function InvoiceFormScreen({ navigation, route }) {
     vehicle_number: "",
     mobile_number: "",
     notes: "",
+    authorised_signatory_name: "",
+    authorised_signature_data: "",
     items: [{ product: "", quantity: "1", rate: "", gst_rate: "", cgst_rate: "", sgst_rate: "", igst_rate: "" }],
   });
   const [error, setError] = useState("");
@@ -301,6 +305,8 @@ export function InvoiceFormScreen({ navigation, route }) {
       vehicle_number: form.vehicle_number,
       mobile_number: form.mobile_number,
       notes: form.notes,
+      authorised_signatory_name: form.authorised_signatory_name,
+      authorised_signature_data: form.authorised_signature_data,
       items: form.items.map((line) => {
         const product = products.find((item) => String(item.id) === line.product);
         return {
@@ -360,6 +366,7 @@ export function InvoiceFormScreen({ navigation, route }) {
         </Card>;
       })}
       <Input label="Invoice notes" value={form.notes} onChangeText={(notes) => setForm((current) => ({ ...current, notes }))} multiline />
+      <Input label="Authorised signatory name" value={form.authorised_signatory_name} onChangeText={(authorised_signatory_name) => setForm((current) => ({ ...current, authorised_signatory_name }))} />
       <Card style={styles.totals}>
         <Total label="Taxable value" value={totals.taxable} />
         {interstate ? <>
