@@ -9,6 +9,8 @@ from .utils import amount_to_words
 
 
 class InvoiceApiTests(TestCase):
+    SIGNATURE_DATA = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAC0lEQVR4nGNgQAcAABIAAXfx+gAAAAAASUVORK5CYII="
+
     def setUp(self):
         self.admin = get_user_model().objects.create_user(username="admin", password="Strong-pass-123", is_staff=True)
         self.staff = get_user_model().objects.create_user(username="staff", password="Strong-pass-123")
@@ -159,6 +161,59 @@ class InvoiceApiTests(TestCase):
         self.assertIn("pincode", invalid.data)
         valid = self.client.patch("/api/settings/", {"pincode": "123456"}, format="json")
         self.assertEqual(valid.status_code, 200, valid.data)
+
+    def test_company_gstin_validates_format_without_matching_state_prefix(self):
+        self.client.force_authenticate(self.admin)
+        response = self.client.patch("/api/settings/", {"gstin": "071234567890123"}, format="json")
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("gstin", response.data)
+        valid_different_prefix = "07ABCDE1234F1Z5"
+        response = self.client.patch("/api/settings/", {"gstin": valid_different_prefix}, format="json")
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data["gstin"], valid_different_prefix)
+
+    def test_new_invoice_snapshots_company_signatory_and_signature(self):
+        company = CompanySettings.objects.get(pk=1)
+        company.authorised_signatory_name = "Saved Signatory"
+        company.authorised_signature_data = self.SIGNATURE_DATA
+        company.save()
+        response = self.client.post("/api/invoices/", {
+            "customer": self.customer.id,
+            "invoice_date": "2026-06-29",
+            "authorised_signatory_name": "Invoice Override",
+            "authorised_signature_data": self.SIGNATURE_DATA,
+            "items": [{"product": self.product.id, "quantity": "1", "rate": "100"}],
+        }, format="json")
+        self.assertEqual(response.status_code, 201, response.data)
+        invoice = Invoice.objects.get(pk=response.data["id"])
+        self.assertEqual(invoice.authorised_signatory_name, "Saved Signatory")
+        self.assertEqual(invoice.authorised_signature_data, self.SIGNATURE_DATA)
+
+    def test_company_signature_settings_round_trip_and_invoice_preserves_snapshot(self):
+        self.client.force_authenticate(self.admin)
+        settings_data = {
+            "authorised_signatory_name": "Saved Signatory",
+            "authorised_signature_data": self.SIGNATURE_DATA,
+        }
+        response = self.client.patch("/api/settings/", settings_data, format="json")
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(self.client.get("/api/settings/").data["authorised_signature_data"], settings_data["authorised_signature_data"])
+        self.client.force_authenticate(self.staff)
+        created = self.client.post("/api/invoices/", {
+            "customer": self.customer.id, "invoice_date": "2026-06-29",
+            "items": [{"product": self.product.id, "quantity": "1", "rate": "100"}],
+        }, format="json")
+        self.assertEqual(created.status_code, 201, created.data)
+        invoice = Invoice.objects.get(pk=created.data["id"])
+        self.assertEqual(invoice.authorised_signatory_name, "Saved Signatory")
+        self.assertEqual(invoice.authorised_signature_data, settings_data["authorised_signature_data"])
+        self.client.force_authenticate(self.admin)
+        self.client.patch("/api/settings/", {"authorised_signature_data": ""}, format="json")
+        invoice.refresh_from_db()
+        self.assertEqual(invoice.authorised_signature_data, settings_data["authorised_signature_data"])
+        pdf = self.client.get(f"/api/invoices/{invoice.id}/pdf/")
+        self.assertEqual(pdf.status_code, 200)
+        self.assertIn(b"/Subtype /Image", pdf.content)
 
     def test_customer_without_state_code_uses_state_name_for_tax(self):
         self.customer.state_code = ""

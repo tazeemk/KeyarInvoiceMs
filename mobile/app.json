@@ -8,6 +8,7 @@
     "userInterfaceStyle": "light",
     "icon": "./assets/keyar-app-icon.png",
     "assetBundlePatterns": ["**/*"],
+    "plugins": [["expo-image-picker", { "microphonePermission": false }]],
     "android": {
       "package": "com.namastess.keyarinvoices",
       "adaptiveIcon": {

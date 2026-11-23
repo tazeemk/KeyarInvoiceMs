@@ -90,9 +90,6 @@ class CompanySettingsSerializer(serializers.ModelSerializer):
         if "pincode" in attrs and not pincode:
             raise serializers.ValidationError({"pincode": "Enter a six-digit PIN code."})
         gstin = attrs.get("gstin", getattr(self.instance, "gstin", ""))
-        state_code = attrs.get("state_code", getattr(self.instance, "state_code", ""))
-        if gstin and gstin != "GSTIN PENDING" and len(gstin) == 15 and state_code and gstin[:2] != state_code:
-            raise serializers.ValidationError({"gstin": "The GSTIN state prefix must match the state code."})
         return attrs
 
     def validate_gstin(self, value):
@@ -193,6 +190,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
             "supplier_state_code", "supplier_pincode", "supplier_phone", "supplier_email", "supplier_bank_name",
             "supplier_bank_account", "supplier_bank_ifsc", "supplier_bank_branch",
             "supplier_logo_data", "supplier_footer",
+            "authorised_signatory_name", "authorised_signature_data",
         )
 
     def validate(self, attrs):
@@ -223,10 +221,6 @@ class InvoiceSerializer(serializers.ModelSerializer):
         if not settings:
             raise serializers.ValidationError({"detail": "Company settings are missing."})
         customer = validated_data["customer"]
-        if not validated_data.get("authorised_signatory_name"):
-            validated_data["authorised_signatory_name"] = settings.authorised_signatory_name
-        if not validated_data.get("authorised_signature_data"):
-            validated_data["authorised_signature_data"] = settings.authorised_signature_data
         invoice_date = validated_data.get("invoice_date", timezone.localdate())
         fiscal_year = f"{invoice_date.year}-{str(invoice_date.year + 1)[-2:]}" if invoice_date.month >= 4 else f"{invoice_date.year - 1}-{str(invoice_date.year)[-2:]}"
         counter, _ = InvoiceCounter.objects.select_for_update().get_or_create(fiscal_year=fiscal_year)
@@ -247,6 +241,8 @@ class InvoiceSerializer(serializers.ModelSerializer):
             supplier_bank_name=settings.bank_name, supplier_bank_account=settings.bank_account,
             supplier_bank_ifsc=settings.bank_ifsc, supplier_bank_branch=settings.bank_branch,
             supplier_logo_data=settings.logo_data, supplier_footer=settings.footer_text,
+            authorised_signatory_name=settings.authorised_signatory_name,
+            authorised_signature_data=settings.authorised_signature_data,
         )
         self._replace_items(invoice, item_data, settings, customer)
         return invoice
